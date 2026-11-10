@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Ignore environment variables
+.env
+.env*.local
+
 # Ignore downloaded dataset directory
 data/
 
