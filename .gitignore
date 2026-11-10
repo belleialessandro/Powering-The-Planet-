@@ -13,6 +13,9 @@ data/
 # C extensions
 *.so
 
+# Local System configurations
+.DS_Store
+
 # Distribution / packaging
 .Python
 build/
