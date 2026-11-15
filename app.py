@@ -1,10 +1,4 @@
-# =============================================================================
-# Powering the Planet: Streamlit dashboard on energy, emissions and growth
-# Run with:  streamlit run app.py
-# Expects:   data/dataset.csv next to this file
-# =============================================================================
 from pathlib import Path
-
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker  # axis formatters / tick locators
 import numpy as np
@@ -39,9 +33,7 @@ SELECTED_ENERGY_COLS = [
 ]
 
 
-# -----------------------------------------------------------------------------
 # Data loading
-# -----------------------------------------------------------------------------
 @st.cache_data  # cached: the CSV is read once, not on every rerun
 def load_data(path: Path) -> pd.DataFrame:
     # Sort by country and year so "last row" always means "latest year"
@@ -87,9 +79,7 @@ def latest_value(data: pd.DataFrame, col: str):
     return last_row[col], int(last_row["year"])
 
 
-# -----------------------------------------------------------------------------
 # Header and KPI tiles (latest available value for each metric)
-# -----------------------------------------------------------------------------
 iso = cdf["iso_code"].iloc[0] if not cdf.empty else ""
 st.title(f"🌍 {country} ({iso})")
 
@@ -114,9 +104,7 @@ k3.metric(
 st.divider()
 
 
-# -----------------------------------------------------------------------------
 # Helpers for the stacked time-series charts
-# -----------------------------------------------------------------------------
 def to_twh(data: pd.DataFrame, share_col: str) -> np.ndarray:
     """Convert a '% of total energy' column into TWh (missing values count as 0)."""
     return (data["total_energy_twh"] * data[share_col].fillna(0.0) / 100.0).to_numpy()
@@ -186,9 +174,7 @@ def prepare(data: pd.DataFrame, share_cols: list) -> pd.DataFrame:
     return out.dropna(how="all", subset=share_cols).reset_index(drop=True)
 
 
-# -----------------------------------------------------------------------------
 # Graph 1: Total energy = Low carbon + Fossil fuels
-# -----------------------------------------------------------------------------
 st.subheader(f"{country}: Total Energy Consumption — Low Carbon vs. Fossil Fuels")
 
 g1_components = [  # (column, legend label, color), bottom to top
@@ -210,9 +196,8 @@ else:
         "if the bands don't reach it, part of the energy isn't classified as fossil or low carbon."
     )
 
-# -----------------------------------------------------------------------------
+
 # Graph 2: Fossil fuels = Coal + Oil + Gas
-# -----------------------------------------------------------------------------
 st.subheader(f"{country}: Fossil Fuel Consumption by Source")
 
 g2_components = [
@@ -231,9 +216,7 @@ else:
         g2, g2_components, total_col="fossil_fuels_energy_share_pct", total_label="Reported fossil total"
     )
 
-# -----------------------------------------------------------------------------
 # Graph 3: Low carbon = Nuclear + Hydro + Wind + Solar + Biofuels + Other renewables
-# -----------------------------------------------------------------------------
 st.subheader(f"{country}: Low-Carbon Energy by Source")
 
 g3_components = [
@@ -265,9 +248,8 @@ else:
 
 st.divider()
 
-# -----------------------------------------------------------------------------
+
 # Decoupling chart: GDP vs energy vs CO2 vs CO2 per capita, indexed to start = 100
-# -----------------------------------------------------------------------------
 st.subheader(f"{country}: Growth vs. Energy vs. Emissions (Index, start = 100)")
 
 # Keep only years where every series is available so the lines share one baseline
