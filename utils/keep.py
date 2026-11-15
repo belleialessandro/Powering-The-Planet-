@@ -5,10 +5,7 @@ RAW_DIR = "data/raw"
 OUT_PATH = "data/dataset.csv"
 START_YEAR = 1960
 
-# =====================================================================
-# SELECT THE COLUMNS YOU WANT TO KEEP FROM EACH DATASET
-# ("iso_code" and "year" are always kept automatically as merge keys)
-# =====================================================================
+# Selecting columns to keep
 SELECTED_ENERGY_COLS = [
     "country",
     "iso_code",
@@ -16,10 +13,16 @@ SELECTED_ENERGY_COLS = [
     "year",
     "solar_energy_share_pct",
     "wind_energy_share_pct",
+    "hydro_energy_share_pct",
+    "biofuels_energy_share_pct",
+    "other_renewables_including_bioenergy_energy_share_pct",
     "nuclear_energy_share_pct",
     "oil_energy_share_pct",
     "gas_energy_share_pct",
     "coal_energy_share_pct",
+    "fossil_fuels_energy_share_pct",
+    "renewables_energy_share_pct",
+    "low_carbon_energy_share_pct",
     "total_energy_twh",
 ]
 
@@ -30,9 +33,8 @@ SELECTED_CO2_COLS = [
 ]
 
 # World Bank GDP indicators (set to False if you don't want one of them)
-KEEP_WB_GDP_PC = True     # -> column "gdp_pc_ppp"
-KEEP_WB_GDP_TOTAL = True  # -> column "gdp_ppp"
-# =====================================================================
+KEEP_WB_GDP_PC = True     #  "gdp_pc_ppp"
+KEEP_WB_GDP_TOTAL = True  #  "gdp_ppp"
 
 
 def load_owid_catalog(filename, keep_cols):
@@ -57,7 +59,7 @@ if __name__ == "__main__":
     energy = load_owid_catalog("owid_energy.csv", SELECTED_ENERGY_COLS)
     co2 = load_owid_catalog("owid_co2.csv", SELECTED_CO2_COLS)
 
-    # Drop any CO2 column already selected in ENERGY_COLS to prevent _x / _y suffixes
+    # Drop any CO2 column already selected in SELECTED_ENERGY_COLS
     co2 = co2[keys + [c for c in co2.columns if c not in energy.columns]]
 
     df = energy.merge(co2, on=keys, how="left")
@@ -72,4 +74,3 @@ if __name__ == "__main__":
 
     df = df.sort_values(keys).reset_index(drop=True)
     df.to_csv(OUT_PATH, index=False)
-    print(f"Saved polished dataset to {OUT_PATH} ({df.shape[0]} rows, {df.shape[1]} columns)")
