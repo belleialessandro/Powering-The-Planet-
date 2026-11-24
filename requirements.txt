@@ -41,3 +41,4 @@ urllib3==2.8.0
 uvicorn==0.54.0
 wbgapi==1.0.14
 websockets==17.4
+nbformat
