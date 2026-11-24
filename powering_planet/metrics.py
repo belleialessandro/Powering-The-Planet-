@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pycountry 
 
 ENERGY_GROUPS: dict[str, list[tuple[str, str, str]]] = {
     "overview": [
@@ -43,3 +44,13 @@ def compute_cagr(start_val: float, end_val: float, years: int) -> float:
     if years <= 0 or pd.isna(start_val) or pd.isna(end_val) or start_val <= 0 or end_val <= 0:
         return np.nan
     return float(((end_val / start_val) ** (1.0 / years) - 1.0) * 100.0)
+
+def iso3_to_flag(iso3: str) -> str:
+    """Convert a 3-letter ISO country code (e.g., 'ITA') to a Unicode flag emoji."""
+    if not isinstance(iso3, str) or len(iso3) != 3 or iso3.startswith("OWID"):
+        return ""
+    country = pycountry.countries.get(alpha_3=iso3.upper())
+    if not country:
+        return ""
+    alpha2 = country.alpha_2.upper()
+    return "".join(chr(ord(char) + 127397) for char in alpha2)

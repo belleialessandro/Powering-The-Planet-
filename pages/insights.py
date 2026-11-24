@@ -2,6 +2,7 @@ from pathlib import Path
 import streamlit as st
 from powering_planet.analysis import gdp_co2_correlation, simulate_transition
 from powering_planet.dataset import EnergyDataset
+from powering_planet.metrics import iso3_to_flag
 from powering_planet.plots import plot_kuznets_scatter
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
@@ -31,7 +32,15 @@ st.divider()
 st.subheader("⚡ What-If Fossil Phase-Out Simulator")
 
 countries = dataset.countries()
-sim_country = st.selectbox("Target Country", countries, index=countries.index("Italy") if "Italy" in countries else 0)
+valid_iso = dataset.df[["country", "iso_code"]].dropna()
+iso_map = dict(zip(valid_iso["country"], valid_iso["iso_code"]))
+
+sim_country = st.selectbox(
+    "Target Country",
+    countries,
+    index=countries.index("Italy") if "Italy" in countries else 0,
+    format_func=lambda c: f"{iso3_to_flag(iso_map.get(c, ''))} {c}".strip(),
+)
 profile = dataset.get_country(sim_country)
 valid_rows = profile.df.dropna(subset=["total_energy_twh", "co2"])
 

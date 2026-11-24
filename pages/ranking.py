@@ -1,6 +1,7 @@
 from pathlib import Path
 import streamlit as st
 from powering_planet.dataset import EnergyDataset
+from powering_planet.metrics import iso3_to_flag
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
 
@@ -41,6 +42,10 @@ display_cols = [
     "gdp_pc_ppp",
 ]
 table = ranked[display_cols].copy()
+table["country"] = table.apply(
+    lambda r: f"{iso3_to_flag(r['iso_code'])} {r['country']}".strip(),
+    axis=1,
+)
 
 st.dataframe(table, use_container_width=True, hide_index=True)
 

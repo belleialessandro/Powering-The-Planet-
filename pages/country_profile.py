@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 from powering_planet.dataset import EnergyDataset
-from powering_planet.metrics import ENERGY_GROUPS
+from powering_planet.metrics import ENERGY_GROUPS, iso3_to_flag
 from powering_planet.plots import plot_decoupling_index, plot_stacked_energy
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
@@ -17,8 +17,16 @@ dataset = get_dataset()
 
 include_aggs = st.sidebar.checkbox("Include OWID regional aggregates", value=False)
 countries = dataset.countries(include_aggregates=include_aggs)
+valid_iso = dataset.df[["country", "iso_code"]].dropna()
+iso_map = dict(zip(valid_iso["country"], valid_iso["iso_code"]))
+
 default_idx = countries.index("Italy") if "Italy" in countries else 0
-country = st.sidebar.selectbox("Select Country", countries, index=default_idx)
+country = st.sidebar.selectbox(
+    "Select Country",
+    countries,
+    index=default_idx,
+    format_func=lambda c: f"{iso3_to_flag(iso_map.get(c, ''))} {c}".strip(),
+)
 
 full_profile = dataset.get_country(country)
 min_y, max_y = int(full_profile.df["year"].min()), int(full_profile.df["year"].max())
@@ -27,7 +35,8 @@ years = st.sidebar.slider("Year Range", min_y, max_y, (max(min_y, max_y - 30), m
 profile = dataset.get_country(country, year_range=years)
 cdf = profile.df
 
-st.title(f"🌍 {profile.country} ({profile.iso_code})")
+flag = iso3_to_flag(profile.iso_code) or "🌍"
+st.title(f"{flag} {profile.country} ({profile.iso_code})")
 
 co2_val, co2_yr = profile.latest("co2")
 gdp_val, gdp_yr = profile.latest("gdp_ppp")
