@@ -42,10 +42,11 @@ country_b = col_b.selectbox(
     format_func=lambda c: f"{iso3_to_flag(iso_map.get(c, ''))} {c}".strip(),
 )
 
+# Blocks if you choose the same country twice
 if country_a == country_b:
     st.warning("Select two different countries in the sidebar for a head-to-head comparison.")
 
-# Restrict slider bounds to the overlapping years available for both selected countries
+# Restrict slider to the overlapping years available for the 2 countries
 full_a = dataset.get_country(country_a)
 full_b = dataset.get_country(country_b)
 min_y = int(max(full_a.df["year"].min(), full_b.df["year"].min()))
@@ -61,16 +62,13 @@ flag_b = iso3_to_flag(prof_b.iso_code) or "🌍"
 label_a = f"{flag_a} {country_a}".strip()
 label_b = f"{flag_b} {country_b}".strip()
 
-st.subheader(f"{label_a}  vs.  {label_b}")
-
-
-# --- 1. Side-by-Side KPI Snapshot ---
+# KPI snapshot, side by side
 def _fmt_metric(val: float, unit: str = "", scale: float = 1.0, decimals: int = 1) -> str:
     if val is None or np.isnan(val):
         return "N/A"
     return f"{val / scale:,.{decimals}f}{unit}"
 
-
+# 6 KPI cards as tuples: (label, column_name, unit, scale, decimals)
 metrics_spec = [
     ("Total CO₂ (Mt)", "co2", " Mt", 1.0, 1),
     ("CO₂ per Capita (t)", "co2_per_capita", " t", 1.0, 2),
@@ -102,7 +100,7 @@ with k_right:
 
 st.divider()
 
-# --- 2. Direct Trajectory Overlay Chart ---
+# Double country trend trajectory chart, you can select which feature to investigate
 st.subheader("📈 Trajectory Comparison Over Time")
 trend_options = {
     "Low-Carbon Energy Share (%)": "low_carbon_energy_share_pct",
@@ -116,7 +114,7 @@ trend_options = {
 selected_label = st.selectbox("Select Indicator to Overlay", list(trend_options.keys()))
 selected_col = trend_options[selected_label]
 
-# Stack both countries into one long frame so Plotly colors them as two series
+# Stack both countries into one long frame so plotly colors them as two series
 df_a = prof_a.df[["year", selected_col]].dropna().assign(Country=label_a)
 df_b = prof_b.df[["year", selected_col]].dropna().assign(Country=label_b)
 combined = pd.concat([df_a, df_b], ignore_index=True)
@@ -138,8 +136,10 @@ else:
 
 st.divider()
 
-# --- 3. Side-by-Side Primary Energy Mixes ---
-st.subheader("⚡ Primary Energy Mix Breakdown")
+# Energy mix for both countries
+st.subheader("⚡ Energy Mix Breakdown")
+
+# horizontal radio selector: overview, fossil, low_carbon
 mix_choice = st.radio(
     "Energy Mix View",
     options=["overview", "fossil", "low_carbon"],
