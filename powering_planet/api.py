@@ -1,114 +1,129 @@
-"""Data retrieval and preprocessing pipeline for OWID Energy, CO2, and World Bank GDP."""
-
 from pathlib import Path
-import pandas as pd
-import requests
+import numpy as np
+import streamlit as st
+from powering_planet.dataset import EnergyDataset
+from powering_planet.metrics import ENERGY_GROUPS, iso3_to_flag
+from powering_planet.plots import plot_decoupling_index, plot_stacked_energy
 
-# Default directories and time cutoff for the cleaned panel dataset
-RAW_DIR = Path("data/raw")
-OUT_PATH = Path("data/dataset.csv")
-START_YEAR = 1960
+DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
 
-# Local cache filenames mapped to OWID catalog and grapher download URLs
-DATASETS = {
-    "owid_energy.csv": "https://catalog.ourworldindata.org/energy/owid_energy/owid_energy.csv",
-    "owid_co2.csv": "https://catalog.ourworldindata.org/emissions/owid_co2/owid_co2.csv",
-    "wb_gdp_pc.csv": "https://ourworldindata.org/grapher/gdp-per-capita-worldbank.csv?v=1&csvType=full&useColumnShortNames=true",
-    "wb_gdp_total.csv": "https://ourworldindata.org/grapher/gdp-worldbank.csv?v=1&csvType=full&useColumnShortNames=true",
-}
 
-# Core identifiers, total energy, and fuel share columns retained from OWID Energy
-SELECTED_ENERGY_COLS = [
-    "country",
-    "iso_code",
-    "population",
-    "year",
-    "solar_energy_share_pct",
-    "wind_energy_share_pct",
-    "hydro_energy_share_pct",
-    "biofuels_energy_share_pct",
-    "other_renewables_including_bioenergy_energy_share_pct",
-    "nuclear_energy_share_pct",
-    "oil_energy_share_pct",
-    "gas_energy_share_pct",
-    "coal_energy_share_pct",
-    "fossil_fuels_energy_share_pct",
-    "renewables_energy_share_pct",
-    "low_carbon_energy_share_pct",
-    "total_energy_twh",
+@st.cache_data
+def get_dataset() -> EnergyDataset:
+    """Cache the loaded EnergyDataset across Streamlit widget reruns."""
+    return EnergyDataset.load(DATA_PATH)
+
+
+dataset = get_dataset()
+
+# Sidebar controls: aggregate toggle, country selector, and year range slider
+include_aggs = st.sidebar.checkbox("Include OWID regional aggregates", value=False)
+countries = dataset.countries(include_aggregates=include_aggs)
+valid_iso = dataset.df[["country", "iso_code"]].dropna()
+iso_map = dict(zip(valid_iso["country"], valid_iso["iso_code"]))
+
+default_idx = countries.index("Italy") if "Italy" in countries else 0
+country = st.sidebar.selectbox(
+    "Select Country",
+    countries,
+    index=default_idx,
+    format_func=lambda c: f"{iso3_to_flag(iso_map.get(c, ''))} {c}".strip(),
+)
+
+# Use full country history to set slider bounds, then slice to selected window
+full_profile = dataset.get_country(country)
+min_y, max_y = int(full_profile.df["year"].min()), int(full_profile.df["year"].max())
+years = st.sidebar.slider("Year Range", min_y, max_y, (max(min_y, max_y - 30), max_y))
+
+profile = dataset.get_country(country, year_range=years)
+cdf = profile.df
+
+flag = iso3_to_flag(profile.iso_code) or "🌍"
+st.title(f"{flag} {profile.country} ({profile.iso_code})")
+
+# Pull most recent non-null values and CAGR-based decoupling classification
+co2_val, co2_yr = profile.latest("co2")
+gdp_val, gdp_yr = profile.latest("gdp_ppp")
+eng_val, eng_yr = profile.latest("total_energy_twh")
+decoupling = profile.decoupling_summary()
+
+# Top 4-column KPI summary row
+k1, k2, k3, k4 = st.columns(4)
+k1.metric(f"Total CO₂ ({co2_yr or 'N/A'})", f"{co2_val:,.1f} Mt" if not np.isnan(co2_val) else "N/A")
+k2.metric(f"Total GDP, PPP ({gdp_yr or 'N/A'})", f"${gdp_val / 1e9:,.1f} B" if not np.isnan(gdp_val) else "N/A")
+k3.metric(f"Total Energy ({eng_yr or 'N/A'})", f"{eng_val:,.1f} TWh" if not np.isnan(eng_val) else "N/A")
+k4.metric(
+    "Growth vs. Emissions",
+    decoupling["status"],
+    delta=f"CO₂ {decoupling['co2_cagr']:+.1f}%/yr" if not np.isnan(decoupling["co2_cagr"]) else None,
+    delta_color="inverse",  # Negative CO2 growth (emissions drop) is shown as favorable
+)
+
+st.divider()
+
+# Stacked area energy mix charts: high-level split, fossil breakdown, and low-carbon breakdown
+st.subheader(f"{flag} Low Carbon vs. Fossil Fuels")
+st.plotly_chart(
+    plot_stacked_energy(cdf, ENERGY_GROUPS["overview"], total_col="total_energy_twh", total_label="Total consumption"),
+    use_container_width=True,
+)
+
+st.subheader(f"{flag} Fossil Fuel Consumption by Source")
+st.plotly_chart(
+    plot_stacked_energy(cdf, ENERGY_GROUPS["fossil"], total_col="fossil_fuels_energy_share_pct", total_label="Reported fossil total"),
+    use_container_width=True,
+)
+
+st.subheader(f"{flag} Low-Carbon Energy by Source")
+st.plotly_chart(
+    plot_stacked_energy(cdf, ENERGY_GROUPS["low_carbon"], total_col="low_carbon_energy_share_pct", total_label="Reported low-carbon total"),
+    use_container_width=True,
+)
+
+st.divider()
+st.subheader(f"{flag} Growth vs. Energy vs. Emissions (Indexed)")
+
+# Guard against empty/single-row slices before drawing the rebased index chart
+if len(cdf[["year", "gdp_ppp", "total_energy_twh", "co2", "co2_per_capita"]].dropna()) >= 2:
+    st.plotly_chart(plot_decoupling_index(cdf), use_container_width=True)
+else:
+    st.info("Not enough overlapping years for the decoupling chart.")
+
+st.divider()
+
+# ---------------------------------------------------------------------------------------------------
+# Country data table using the pipeline columns from api.py
+st.subheader(f"{flag} {profile.country} Data Table ({years[0]}–{years[1]})")
+
+api_table_cols = [
+    c
+    for c in [
+        "year",
+        "country",
+        "iso_code",
+        "population",
+        "total_energy_twh",
+        "fossil_fuels_energy_share_pct",
+        "coal_energy_share_pct",
+        "oil_energy_share_pct",
+        "gas_energy_share_pct",
+        "low_carbon_energy_share_pct",
+        "renewables_energy_share_pct",
+        "nuclear_energy_share_pct",
+        "hydro_energy_share_pct",
+        "wind_energy_share_pct",
+        "solar_energy_share_pct",
+        "biofuels_energy_share_pct",
+        "other_renewables_including_bioenergy_energy_share_pct",
+        "co2",
+        "co2_per_capita",
+        "share_global_co2",
+        "gdp_pc_ppp",
+        "gdp_ppp",
+    ]
+    if c in cdf.columns
 ]
 
-# Emissions metrics kept from OWID CO2 (keys/population come from energy table)
-SELECTED_CO2_COLS = [
-    "co2",
-    "co2_per_capita",
-    "share_global_co2",
-]
-
-
-def download_file(url: str, path: Path, force: bool = False) -> Path:
-    """Download a single CSV file if not already cached locally."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Skip network download when cached unless force=True is requested
-    if path.exists() and not force:
-        return path
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()  # Fail early on HTTP errors instead of saving error HTML
-    path.write_bytes(response.content)
-    return path
-
-
-def download_all(raw_dir: Path = RAW_DIR, force: bool = False) -> None:
-    """Fetch all raw OWID and World Bank datasets."""
-    for filename, url in DATASETS.items():
-        download_file(url, raw_dir / filename, force=force)
-
-
-def _load_owid_catalog(path: Path, keep_cols: list[str], start_year: int) -> pd.DataFrame:
-    """Load an OWID catalog CSV, drop rows without ISO codes, and filter years."""
-    df = pd.read_csv(path)
-    df = df[df["iso_code"].notna() & (df["year"] >= start_year)]
-    # Always place merge keys first without duplicating them
-    cols = ["iso_code", "year"] + [c for c in keep_cols if c not in ("iso_code", "year")]
-    return df[cols]
-
-
-def _load_owid_grapher(path: Path, target_col: str, start_year: int) -> pd.DataFrame:
-    """Load an OWID grapher indicator CSV and standardize key and value column names."""
-    df = pd.read_csv(path)
-    df = df[df["code"].notna() & (df["year"] >= start_year)]
-    # Identify the indicator column by excluding standard OWID metadata columns
-    val_col = [c for c in df.columns if c not in ("entity", "code", "year")][0]
-    return df.rename(columns={"code": "iso_code", val_col: target_col})[["iso_code", "year", target_col]]
-
-
-def build_dataset(raw_dir: Path = RAW_DIR, out_path: Path = OUT_PATH, start_year: int = START_YEAR) -> pd.DataFrame:
-    """Merge raw energy, CO2, and GDP tables on (iso_code, year) and save to CSV."""
-    keys = ["iso_code", "year"]
-
-    # Load energy as base table and left-join CO2 without duplicating overlapping columns
-    energy = _load_owid_catalog(raw_dir / "owid_energy.csv", SELECTED_ENERGY_COLS, start_year)
-    co2 = _load_owid_catalog(raw_dir / "owid_co2.csv", SELECTED_CO2_COLS, start_year)
-    co2 = co2[keys + [c for c in co2.columns if c not in energy.columns]]
-
-    df = energy.merge(co2, on=keys, how="left")
-
-    # Left-join World Bank PPP GDP per capita and total GDP so energy rows are preserved
-    gdp_pc = _load_owid_grapher(raw_dir / "wb_gdp_pc.csv", "gdp_pc_ppp", start_year)
-    df = df.merge(gdp_pc, on=keys, how="left")
-
-    gdp_total = _load_owid_grapher(raw_dir / "wb_gdp_total.csv", "gdp_ppp", start_year)
-    df = df.merge(gdp_total, on=keys, how="left")
-
-    # Sort deterministically and write clean CSV without DataFrame index column
-    df = df.sort_values(keys).reset_index(drop=True)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out_path, index=False)
-    return df
-
-# Runs only when i execute python -m powering_planet.api or python powering_planet/api.py directly from terminal
-if __name__ == "__main__":
-    download_all()
-    build_dataset()
-
+country_table = cdf[api_table_cols].sort_values("year", ascending=False).reset_index(drop=True)
+st.dataframe(country_table, use_container_width=True, hide_index=True)
     
