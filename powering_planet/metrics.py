@@ -2,8 +2,9 @@
 
 import numpy as np
 import pandas as pd
-import pycountry 
+import pycountry
 
+# Chart series definitions: (column_name, display_label, hex_color)
 ENERGY_GROUPS: dict[str, list[tuple[str, str, str]]] = {
     "overview": [
         ("fossil_fuels_energy_share_pct", "Fossil fuels", "#6b4f4a"),
@@ -27,12 +28,14 @@ ENERGY_GROUPS: dict[str, list[tuple[str, str, str]]] = {
 
 def share_to_twh(df: pd.DataFrame, share_col: str) -> pd.Series:
     """Convert a percentage share column into primary energy (TWh)."""
+    # Treat missing share values as 0% so stacked areas remain continuous
     return df["total_energy_twh"] * df[share_col].fillna(0.0) / 100.0
 
 
 def add_derived_metrics(df: pd.DataFrame) -> pd.DataFrame:
     """Compute carbon intensity of energy (Mt/TWh) and energy intensity of GDP (TWh/$B)."""
     out = df.copy()
+    # Replace zeros with NaN before dividing to avoid inf/-inf values
     out["carbon_intensity_energy"] = out["co2"] / out["total_energy_twh"].replace(0, np.nan)
     gdp_billions = out["gdp_ppp"] / 1e9
     out["energy_intensity_gdp"] = out["total_energy_twh"] / gdp_billions.replace(0, np.nan)
@@ -45,6 +48,7 @@ def compute_cagr(start_val: float, end_val: float, years: int) -> float:
         return np.nan
     return float(((end_val / start_val) ** (1.0 / years) - 1.0) * 100.0)
 
+
 def iso3_to_flag(iso3: str) -> str:
     """Convert a 3-letter ISO country code (e.g., 'ITA') to a Unicode flag emoji."""
     if not isinstance(iso3, str) or len(iso3) != 3 or iso3.startswith("OWID"):
@@ -52,5 +56,6 @@ def iso3_to_flag(iso3: str) -> str:
     country = pycountry.countries.get(alpha_3=iso3.upper())
     if not country:
         return ""
+    # Map ISO-2 letters ('A'..'Z' -> 65..90) into regional indicator symbols (127462..127487)
     alpha2 = country.alpha_2.upper()
     return "".join(chr(ord(char) + 127397) for char in alpha2)

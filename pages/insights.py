@@ -10,12 +10,14 @@ DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
 
 @st.cache_data
 def get_dataset() -> EnergyDataset:
+    """Cache the loaded EnergyDataset across Streamlit reruns."""
     return EnergyDataset.load(DATA_PATH)
 
 
 dataset = get_dataset()
 st.title("📊 Cross-Country Insights & Decarbonization Simulator")
 
+# Cross-country correlation summary and scatter plot for a selected year
 years = dataset.available_years()
 default_year = 2022 if 2022 in years else years[-1]
 year = st.selectbox("Snapshot Year", years, index=years.index(default_year))
@@ -31,6 +33,7 @@ st.plotly_chart(plot_kuznets_scatter(dataset.df, year), use_container_width=True
 st.divider()
 st.subheader("⚡ What-If Fossil Phase-Out Simulator")
 
+# Select target country and use its most recent row with both energy and CO2 data as baseline
 countries = dataset.countries()
 valid_iso = dataset.df[["country", "iso_code"]].dropna()
 iso_map = dict(zip(valid_iso["country"], valid_iso["iso_code"]))
@@ -54,6 +57,7 @@ else:
         f"Gas share: **{latest_row['gas_energy_share_pct']:.1f}%**"
     )
 
+    # Sliders control percentage of coal and gas shares replaced by zero-carbon energy
     s1, s2 = st.columns(2)
     coal_cut = s1.slider("Replace Coal Share with Zero-Carbon (%)", 0, 100, 50)
     gas_cut = s2.slider("Replace Gas Share with Zero-Carbon (%)", 0, 100, 25)

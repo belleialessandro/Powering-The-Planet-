@@ -15,6 +15,7 @@ def plot_stacked_energy(
     """Build an interactive stacked area chart of primary energy consumption in TWh."""
     fig = go.Figure()
 
+    # Add each fuel/group share converted to TWh into a single shared stackgroup
     for col, label, color in components:
         fig.add_trace(
             go.Scatter(
@@ -29,6 +30,7 @@ def plot_stacked_energy(
             )
         )
 
+    # Optional benchmark line showing either total energy or an aggregate share converted to TWh
     if total_col is not None:
         y_total = df["total_energy_twh"] if total_col == "total_energy_twh" else share_to_twh(df, total_col)
         fig.add_trace(
@@ -67,6 +69,7 @@ def plot_decoupling_index(df: pd.DataFrame) -> go.Figure:
 
     fig = go.Figure()
     for col, label, color in series:
+        # Rebase every series to 100 at the first complete observation year
         fig.add_trace(
             go.Scatter(
                 x=ddf["year"],

@@ -17,6 +17,7 @@ class CountryProfile:
         valid = self.df[["year", col]].dropna()
         if valid.empty:
             return np.nan, None
+        # Assumes self.df is sorted chronologically by year
         row = valid.iloc[-1]
         return float(row[col]), int(row["year"])
 
@@ -31,6 +32,7 @@ class CountryProfile:
         gdp_cagr = compute_cagr(first["gdp_ppp"], last["gdp_ppp"], span)
         co2_cagr = compute_cagr(first["co2"], last["co2"], span)
 
+        # Absolute: GDP rises while CO2 falls; Relative: GDP rises faster than CO2
         if gdp_cagr > 0 and co2_cagr < 0:
             status = "Absolute Decoupling"
         elif gdp_cagr > 0 and co2_cagr < gdp_cagr:

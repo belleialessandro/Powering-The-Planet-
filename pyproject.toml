@@ -1,5 +1,6 @@
+# pyproject.toml
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools"] # Build tool needed for `pip install -e .` and packaging
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,4 +9,4 @@ version = "0.1.0"
 requires-python = ">=3.11"
 
 [tool.setuptools.packages.find]
-include = ["powering_planet*"]
+include = ["powering_planet*"] # Only package the `powering_planet` source directory

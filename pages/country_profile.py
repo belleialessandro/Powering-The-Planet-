@@ -10,11 +10,13 @@ DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
 
 @st.cache_data
 def get_dataset() -> EnergyDataset:
+    """Cache the loaded EnergyDataset across Streamlit widget reruns."""
     return EnergyDataset.load(DATA_PATH)
 
 
 dataset = get_dataset()
 
+# Sidebar controls: aggregate toggle, country selector, and year range slider
 include_aggs = st.sidebar.checkbox("Include OWID regional aggregates", value=False)
 countries = dataset.countries(include_aggregates=include_aggs)
 valid_iso = dataset.df[["country", "iso_code"]].dropna()
@@ -28,6 +30,7 @@ country = st.sidebar.selectbox(
     format_func=lambda c: f"{iso3_to_flag(iso_map.get(c, ''))} {c}".strip(),
 )
 
+# Use full country history to set slider bounds, then slice to selected window
 full_profile = dataset.get_country(country)
 min_y, max_y = int(full_profile.df["year"].min()), int(full_profile.df["year"].max())
 years = st.sidebar.slider("Year Range", min_y, max_y, (max(min_y, max_y - 30), max_y))
@@ -38,11 +41,13 @@ cdf = profile.df
 flag = iso3_to_flag(profile.iso_code) or "🌍"
 st.title(f"{flag} {profile.country} ({profile.iso_code})")
 
+# Pull most recent non-null values and CAGR-based decoupling classification
 co2_val, co2_yr = profile.latest("co2")
 gdp_val, gdp_yr = profile.latest("gdp_ppp")
 eng_val, eng_yr = profile.latest("total_energy_twh")
 decoupling = profile.decoupling_summary()
 
+# Top 4-column KPI summary row
 k1, k2, k3, k4 = st.columns(4)
 k1.metric(f"Total CO₂ ({co2_yr or 'N/A'})", f"{co2_val:,.1f} Mt" if not np.isnan(co2_val) else "N/A")
 k2.metric(f"Total GDP, PPP ({gdp_yr or 'N/A'})", f"${gdp_val / 1e9:,.1f} B" if not np.isnan(gdp_val) else "N/A")
@@ -51,11 +56,12 @@ k4.metric(
     "Growth vs. Emissions",
     decoupling["status"],
     delta=f"CO₂ {decoupling['co2_cagr']:+.1f}%/yr" if not np.isnan(decoupling["co2_cagr"]) else None,
-    delta_color="inverse",
+    delta_color="inverse",  # Negative CO2 growth (emissions drop) is shown as favorable
 )
 
 st.divider()
 
+# Stacked area energy mix charts: high-level split, fossil breakdown, and low-carbon breakdown
 st.subheader(f"{country}: Low Carbon vs. Fossil Fuels")
 st.plotly_chart(
     plot_stacked_energy(cdf, ENERGY_GROUPS["overview"], total_col="total_energy_twh", total_label="Total consumption"),
@@ -76,6 +82,8 @@ st.plotly_chart(
 
 st.divider()
 st.subheader(f"{country}: Growth vs. Energy vs. Emissions (Indexed)")
+
+# Guard against empty/single-row slices before drawing the rebased index chart
 if len(cdf[["year", "gdp_ppp", "total_energy_twh", "co2", "co2_per_capita"]].dropna()) >= 2:
     st.plotly_chart(plot_decoupling_index(cdf), use_container_width=True)
 else:

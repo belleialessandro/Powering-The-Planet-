@@ -12,13 +12,14 @@ DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "dataset.csv"
 
 @st.cache_data
 def get_dataset() -> EnergyDataset:
+    """Cache the loaded EnergyDataset across Streamlit reruns."""
     return EnergyDataset.load(DATA_PATH)
 
 
 dataset = get_dataset()
 st.title("⚖️ Head-to-Head Country Comparison")
 
-# Sidebar controls
+# Sidebar selectors for aggregates, countries, and shared year range
 include_aggs = st.sidebar.checkbox("Include OWID regional aggregates", value=False)
 countries = dataset.countries(include_aggregates=include_aggs)
 valid_iso = dataset.df[["country", "iso_code"]].dropna()
@@ -44,7 +45,7 @@ country_b = col_b.selectbox(
 if country_a == country_b:
     st.warning("Select two different countries in the sidebar for a head-to-head comparison.")
 
-# Shared overlapping year range
+# Restrict slider bounds to the overlapping years available for both selected countries
 full_a = dataset.get_country(country_a)
 full_b = dataset.get_country(country_b)
 min_y = int(max(full_a.df["year"].min(), full_b.df["year"].min()))
@@ -61,6 +62,7 @@ label_a = f"{flag_a} {country_a}".strip()
 label_b = f"{flag_b} {country_b}".strip()
 
 st.subheader(f"{label_a}  vs.  {label_b}")
+
 
 # --- 1. Side-by-Side KPI Snapshot ---
 def _fmt_metric(val: float, unit: str = "", scale: float = 1.0, decimals: int = 1) -> str:
@@ -114,6 +116,7 @@ trend_options = {
 selected_label = st.selectbox("Select Indicator to Overlay", list(trend_options.keys()))
 selected_col = trend_options[selected_label]
 
+# Stack both countries into one long frame so Plotly colors them as two series
 df_a = prof_a.df[["year", selected_col]].dropna().assign(Country=label_a)
 df_b = prof_b.df[["year", selected_col]].dropna().assign(Country=label_b)
 combined = pd.concat([df_a, df_b], ignore_index=True)
