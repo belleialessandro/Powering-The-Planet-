@@ -47,44 +47,88 @@ gdp_val, gdp_yr = profile.latest("gdp_ppp")
 eng_val, eng_yr = profile.latest("total_energy_twh")
 decoupling = profile.decoupling_summary()
 
-# Top 4-column KPI summary row
-k1, k2, k3, k4 = st.columns(4)
+# Top KPI summary row
+k1, k2, k3, k4 = st.columns([1, 1, 1, 1.3])
 k1.metric(f"Total CO₂ ({co2_yr or 'N/A'})", f"{co2_val:,.1f} Mt" if not np.isnan(co2_val) else "N/A")
-k2.metric(f"Total GDP, PPP ({gdp_yr or 'N/A'})", f"${gdp_val / 1e9:,.1f} B" if not np.isnan(gdp_val) else "N/A")
+k2.metric(f"Total GDP PPP ({gdp_yr or 'N/A'})", f"${gdp_val / 1e9:,.1f} B" if not np.isnan(gdp_val) else "N/A")
 k3.metric(f"Total Energy ({eng_yr or 'N/A'})", f"{eng_val:,.1f} TWh" if not np.isnan(eng_val) else "N/A")
+
+# Shorten label for the large KPI font so it doesn't truncate like before
+short_status = decoupling["status"].replace(" Decoupling", "")
 k4.metric(
-    "Growth vs. Emissions",
-    decoupling["status"],
-    delta=f"CO₂ {decoupling['co2_cagr']:+.1f}%/yr" if not np.isnan(decoupling["co2_cagr"]) else None,
-    delta_color="inverse",  # Negative CO2 growth (emissions drop) is shown as favorable
+    "Decoupling Status",
+    short_status,
+    delta=f"{decoupling['co2_cagr']:+.1f}%/yr CO₂" if not np.isnan(decoupling["co2_cagr"]) else None,
+    delta_color="inverse",  # Leading '-' is now parsed as negative -> green downward arrow
 )
 
 st.divider()
 
 # Stacked area energy mix charts: high-level split, fossil breakdown, and low-carbon breakdown
-st.subheader(f"{country}: Low Carbon vs. Fossil Fuels")
+st.subheader(f"{flag} Low Carbon vs. Fossil Fuels")
 st.plotly_chart(
     plot_stacked_energy(cdf, ENERGY_GROUPS["overview"], total_col="total_energy_twh", total_label="Total consumption"),
     use_container_width=True,
 )
 
-st.subheader(f"{country}: Fossil Fuel Consumption by Source")
+st.subheader(f"{flag} Fossil Fuel Consumption by Source")
 st.plotly_chart(
     plot_stacked_energy(cdf, ENERGY_GROUPS["fossil"], total_col="fossil_fuels_energy_share_pct", total_label="Reported fossil total"),
     use_container_width=True,
 )
 
-st.subheader(f"{country}: Low-Carbon Energy by Source")
+st.subheader(f"{flag} Low-Carbon Energy by Source")
 st.plotly_chart(
     plot_stacked_energy(cdf, ENERGY_GROUPS["low_carbon"], total_col="low_carbon_energy_share_pct", total_label="Reported low-carbon total"),
     use_container_width=True,
 )
 
 st.divider()
-st.subheader(f"{country}: Growth vs. Energy vs. Emissions (Indexed)")
+st.subheader(f"{flag} Growth vs. Energy vs. Emissions (Indexed)")
 
 # Guard against empty/single-row slices before drawing the rebased index chart
 if len(cdf[["year", "gdp_ppp", "total_energy_twh", "co2", "co2_per_capita"]].dropna()) >= 2:
     st.plotly_chart(plot_decoupling_index(cdf), use_container_width=True)
 else:
     st.info("Not enough overlapping years for the decoupling chart.")
+
+st.divider()
+
+# ---------------------------------------------------------------------------------------------------
+# Country data table using the pipeline columns from api.py
+st.subheader(f"{flag} {profile.country} Data Table ({years[0]}–{years[1]})")
+
+api_table_cols = [
+    (col, label)
+    for col, label in [
+        ("year", "Year"),
+        ("population", "Population"),
+        ("total_energy_twh", "Total Energy (TWh)"),
+        ("coal_energy_share_pct", "Coal %"),
+        ("oil_energy_share_pct", "Oil %"),
+        ("gas_energy_share_pct", "Gas %"),
+        ("nuclear_energy_share_pct", "Nuclear %"),
+        ("hydro_energy_share_pct", "Hydro %"),
+        ("wind_energy_share_pct", "Wind %"),
+        ("solar_energy_share_pct", "Solar %"),
+        ("biofuels_energy_share_pct", "Biofuels %"),
+        ("other_renewables_including_bioenergy_energy_share_pct", "Other Renewables %"),
+        ("co2", "CO₂ (Mt)"),
+        ("co2_per_capita", "CO₂ / Capita (t)"),
+        ("share_global_co2", "CO₂ global %"),
+        ("gdp_pc_ppp", "GDP / Capita PPP ($)"),
+        ("gdp_ppp", "GDP PPP ($)"),
+    ]
+    if col in cdf.columns
+]
+
+raw_cols = [col for col, _ in api_table_cols]
+rename_map = dict(api_table_cols)
+
+country_table = (
+    cdf[raw_cols]
+    .sort_values("year", ascending=False)
+    .rename(columns=rename_map)
+    .reset_index(drop=True)
+)
+st.dataframe(country_table, use_container_width=True, hide_index=True)
