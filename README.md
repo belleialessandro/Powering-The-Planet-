@@ -39,21 +39,22 @@ The pipeline integrates three open macroeconomic and energy datasets:
 Powering-The-Planet-/
 ├── app.py                        # Streamlit multiple page application entrypoint
 ├── pyproject.toml                # Package build configuration
-├── requirements.txt              # Python dependencies
+├── requirements.txt              # Dependencies
 ├── data/
-│   ├── raw/                      # Raw source files (excluded in .gitignore)
+│   ├── raw/                      # Raw source files 
 │   └── dataset.csv               # Cleaned, merged panel dataset
 ├── notebooks/
-│   └── walkthrough.ipynb         # End-to-end demonstration of the Python API
+│   └── walkthrough.ipynb         # demonstration and graphs
+|   └── inspect.ipynb             # Pre-merge csv analysis
 ├── pages/
-│   ├── country_profile.py        # Country energy mix & decoupling page
-│   ├── compare.py                # Head-2-head comparison page
-│   ├── ranking.py                # Global leaderboard & CSV export page
-│   └── insights.py               # GDP/CO2 scatter & transition simulator page
+│   ├── country_profile.py        # Country energy mix, decoupling page, fossil replacing simulator
+│   ├── compare.py                # Country comparison page
+│   └── ranking.py                # Global leaderboard by feature and csv export 
+│                 
 └── powering_planet/
     ├── __init__.py
     ├── api.py                    # Data fetching and preprocessing pipeline
     ├── dataset.py                # EnergyDataset and CountryProfile classes
     ├── metrics.py                # Energy groups, intensity metrics, CAGR & flag helpers
-    ├── analysis.py               # Statistical correlation & counterfactual simulator
-    └── plots.py                  # Interactive Plotly chart builders
+    ├── analysis.py               # Scenario modeling for source transition
+    └── plots.py                  # Interactive plotly charts
