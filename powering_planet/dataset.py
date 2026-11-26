@@ -1,80 +1,78 @@
-"""Dataset loader, validator, and query interface."""
+"""Functions to load, filter, and rank country energy data."""
 
-from pathlib import Path
+import os
+import numpy as np
 import pandas as pd
-from .metrics import add_derived_metrics
-from .models import CountryProfile
+from powering_planet.metrics import add_intensity_columns, compute_cagr
 
-# Columns required before constructing an EnergyDataset instance
-REQUIRED_ENERGY_COLS = [
-    "country",
-    "iso_code",
-    "population",
-    "year",
-    "solar_energy_share_pct",
-    "wind_energy_share_pct",
-    "hydro_energy_share_pct",
-    "biofuels_energy_share_pct",
-    "other_renewables_including_bioenergy_energy_share_pct",
-    "nuclear_energy_share_pct",
-    "oil_energy_share_pct",
-    "gas_energy_share_pct",
-    "coal_energy_share_pct",
-    "fossil_fuels_energy_share_pct",
-    "renewables_energy_share_pct",
-    "low_carbon_energy_share_pct",
-    "total_energy_twh",
-]
+DEFAULT_DATA_PATH = os.path.join("data", "dataset.csv")
 
 
-class EnergyDataset:
-    """Encapsulates the merged global energy, emissions, and GDP dataset."""
+def load_data(path=DEFAULT_DATA_PATH):
+    """Load the merged CSV and add intensity columns."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Dataset not found at {path}. Run python -m powering_planet.api first.")
+    df = pd.read_csv(path)
+    df = add_intensity_columns(df)
+    return df.sort_values(["country", "year"]).reset_index(drop=True)
 
-    def __init__(self, df: pd.DataFrame):
-        # Validate schema up front so missing columns fail with an explicit error
-        missing = [c for c in REQUIRED_ENERGY_COLS if c not in df.columns]
-        if missing:
-            raise ValueError(f"Missing required columns: {missing}")
-        # Compute intensity metrics and keep a deterministic sort order
-        self.df = add_derived_metrics(df).sort_values(["country", "year"]).reset_index(drop=True)
 
-    @classmethod
-    def load(cls, path: str | Path = "data/dataset.csv") -> "EnergyDataset":
-        """Read a dataset CSV from disk and instantiate EnergyDataset."""
-        return cls(pd.read_csv(path))
+def get_countries(df):
+    """Return a sorted list of country names."""
+    is_agg = df["iso_code"].fillna("").str.startswith("OWID_")
+    sub = df[~is_agg]
+    names = sub["country"].dropna().unique().tolist()
+    return sorted(names)
 
-    def countries(self, include_aggregates: bool = False) -> list[str]:
-        """Return sorted entity names, excluding OWID_* aggregates unless requested."""
-        sub = self.df if include_aggregates else self.df[~self.df["iso_code"].str.startswith("OWID_", na=True)]
-        return sorted(sub["country"].dropna().unique())
 
-    def available_years(self) -> list[int]:
-        """Return all available observation years as sorted Python integers."""
-        return sorted(self.df["year"].dropna().astype(int).unique())
+def filter_country(df, country, years=None):
+    """Return rows for one country, optionally filtered to a (start_year, end_year) tuple."""
+    sub = df[df["country"] == country].copy()
+    if years is not None:
+        start_y, end_y = years
+        sub = sub[(sub["year"] >= start_y) & (sub["year"] <= end_y)]
+    return sub.sort_values("year").reset_index(drop=True)
 
-    def get_country(self, country: str, year_range: tuple[int, int] | None = None) -> CountryProfile:
-        """Return a CountryProfile sliced to a single country and optional year window."""
-        cdf = self.df[self.df["country"] == country].copy()
-        if year_range is not None:
-            cdf = cdf[cdf["year"].between(year_range[0], year_range[1])]
-        iso = str(cdf["iso_code"].iloc[0]) if not cdf.empty else ""
-        return CountryProfile(country=country, iso_code=iso, df=cdf)
 
-    def ranking(
-        self,
-        year: int,
-        sort_by: str = "low_carbon_energy_share_pct",
-        ascending: bool = False,
-        min_population: float = 1_000_000,
-    ) -> pd.DataFrame:
-        """Rank non-aggregate entities for a given year, metric, and population floor."""
-        sub = self.df[
-            (self.df["year"] == year)
-            & (~self.df["iso_code"].str.startswith("OWID_", na=True))
-            & (self.df["population"].fillna(0) >= min_population)
-        ].copy()
+def latest_value(df, col):
+    """Return (value, year) for the latest non-missing value in a column."""
+    valid = df[["year", col]].dropna()
+    if valid.empty:
+        return np.nan, None
+    last_row = valid.iloc[-1]
+    return float(last_row[col]), int(last_row["year"])
 
-        # Drop missing values on the ranking metric and assign 1-based rank positions
-        sub = sub.dropna(subset=[sort_by]).sort_values(sort_by, ascending=ascending).reset_index(drop=True)
-        sub.insert(0, "rank", sub.index + 1)
-        return sub
+
+def decoupling_status(df):
+    """Classify GDP vs. CO2 growth over a country DataFrame."""
+    valid = df[["year", "gdp_ppp", "co2"]].dropna()
+    if len(valid) < 2:
+        return {"status": "Insufficient data", "gdp_cagr": np.nan, "co2_cagr": np.nan}
+
+    first_row = valid.iloc[0]
+    last_row = valid.iloc[-1]
+    span = int(last_row["year"] - first_row["year"])
+
+    gdp_cagr = compute_cagr(first_row["gdp_ppp"], last_row["gdp_ppp"], span)
+    co2_cagr = compute_cagr(first_row["co2"], last_row["co2"], span)
+
+    if pd.isna(gdp_cagr) or pd.isna(co2_cagr):
+        status = "Insufficient data"
+    elif gdp_cagr > 0 and co2_cagr < 0:
+        status = "Absolute Decoupling"
+    elif gdp_cagr > 0 and co2_cagr < gdp_cagr:
+        status = "Relative Decoupling"
+    else:
+        status = "Coupled / No Growth"
+
+    return {"status": status, "gdp_cagr": gdp_cagr, "co2_cagr": co2_cagr}
+
+
+def rank_countries(df, year, sort_by, ascending=False):
+    """Rank countries for a single year by a chosen column."""
+    is_agg = df["iso_code"].fillna("").str.startswith("OWID_")
+    sub = df[(df["year"] == year) & (~is_agg)].copy()
+    sub = sub.dropna(subset=[sort_by])
+    sub = sub.sort_values(sort_by, ascending=ascending).reset_index(drop=True)
+    sub.insert(0, "rank", sub.index + 1)
+    return sub

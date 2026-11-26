@@ -1,119 +1,113 @@
-"""Reusable Plotly figure builders (free of Streamlit dependencies)."""
+"""Simple Plotly chart functions (no Streamlit code here)."""
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from .metrics import share_to_twh
+from powering_planet.metrics import COLORS, share_to_twh
 
 
-def plot_stacked_energy(
-    df: pd.DataFrame,
-    components: list[tuple[str, str, str]],
-    total_col: str | None = None,
-    total_label: str = "Reported total",
-) -> go.Figure:
-    """Build an interactive stacked area chart of primary energy consumption in TWh."""
-    fig = go.Figure()
+def make_energy_chart(df, sources, title):
+    """Build a stacked area chart of primary energy (TWh) over time."""
+    plot_df = df[["year"]].copy()
+    value_cols = []
+    for col, label in sources:
+        plot_df[label] = share_to_twh(df, col)
+        value_cols.append(label)
 
-    # Add each fuel/group share converted to TWh into a single shared stackgroup
-    for col, label, color in components:
-        fig.add_trace(
-            go.Scatter(
-                x=df["year"],
-                y=share_to_twh(df, col),
-                name=label,
-                mode="lines",
-                stackgroup="one",
-                line=dict(width=0.5, color=color),
-                fillcolor=color,
-                hovertemplate="%{y:,.1f} TWh<extra>" + label + "</extra>",
-            )
-        )
-
-    # Optional benchmark line showing either total energy or an aggregate share converted to TWh
-    if total_col is not None:
-        y_total = df["total_energy_twh"] if total_col == "total_energy_twh" else share_to_twh(df, total_col)
-        fig.add_trace(
-            go.Scatter(
-                x=df["year"],
-                y=y_total,
-                name=total_label,
-                mode="lines",
-                line=dict(color="#222222", width=2),
-                hovertemplate="%{y:,.1f} TWh<extra>" + total_label + "</extra>",
-            )
-        )
-
-    fig.update_layout(
-        hovermode="x unified",
-        yaxis_title="Primary energy (TWh)",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
-        margin=dict(l=20, r=20, t=20, b=60),
-        height=400,
+    long_df = plot_df.melt(
+        id_vars="year",
+        value_vars=value_cols,
+        var_name="Source",
+        value_name="TWh",
+    )
+    fig = px.area(
+        long_df,
+        x="year",
+        y="TWh",
+        color="Source",
+        color_discrete_map=COLORS,
+        title=title,
+        labels={"year": "Year", "TWh": "Primary Energy (TWh)"},
+        template="plotly_white",
     )
     return fig
 
 
-def plot_decoupling_index(df: pd.DataFrame) -> go.Figure:
-    """Build an indexed (start year = 100) line chart comparing GDP, energy, and CO2."""
-    ddf = df[["year", "gdp_ppp", "total_energy_twh", "co2", "co2_per_capita"]].dropna()
-    base = ddf.iloc[0]
+def make_decoupling_chart(df):
+    """Build an indexed line chart (first year = 100) for GDP, energy, and CO2."""
+    cols = ["year", "gdp_ppp", "total_energy_twh", "co2"]
+    sub = df[cols].dropna().copy()
+    if len(sub) < 2:
+        return None
+
+    base = sub.iloc[0]
+    sub["GDP (PPP)"] = sub["gdp_ppp"] / base["gdp_ppp"] * 100
+    sub["Energy Use"] = sub["total_energy_twh"] / base["total_energy_twh"] * 100
+    sub["CO2 Emissions"] = sub["co2"] / base["co2"] * 100
+
+    long_df = sub.melt(
+        id_vars="year",
+        value_vars=["GDP (PPP)", "Energy Use", "CO2 Emissions"],
+        var_name="Indicator",
+        value_name="Index",
+    )
     base_year = int(base["year"])
-
-    series = [
-        ("gdp_ppp", "GDP (PPP)", "#549e01"),
-        ("total_energy_twh", "Energy use", "#ffb413"),
-        ("co2", "CO₂ emissions", "#ff4935"),
-        ("co2_per_capita", "Per capita emissions", "#ab0a0a"),
-    ]
-
-    fig = go.Figure()
-    for col, label, color in series:
-        # Rebase every series to 100 at the first complete observation year
-        fig.add_trace(
-            go.Scatter(
-                x=ddf["year"],
-                y=ddf[col] / base[col] * 100.0,
-                name=label,
-                mode="lines",
-                line=dict(color=color, width=2.5),
-                hovertemplate="%{y:,.1f}<extra>" + label + "</extra>",
-            )
-        )
-
-    fig.add_hline(y=100, line_dash="dash", line_color="#888888", line_width=1)
-    fig.update_layout(
-        hovermode="x unified",
-        yaxis_title=f"Index ({base_year} = 100)",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
-        margin=dict(l=20, r=20, t=20, b=60),
-        height=400,
+    fig = px.line(
+        long_df,
+        x="year",
+        y="Index",
+        color="Indicator",
+        color_discrete_map=COLORS,
+        title=f"Indexed Trends ({base_year} = 100)",
+        labels={"year": "Year", "Index": f"Index ({base_year} = 100)"},
+        template="plotly_white",
     )
     return fig
 
 
-def plot_kuznets_scatter(df: pd.DataFrame, year: int) -> go.Figure:
-    """Build a bubble scatter plot of GDP per capita vs. CO2 per capita colored by low-carbon share."""
-    sub = df[
-        (df["year"] == year)
-        & (~df["iso_code"].str.startswith("OWID_", na=True))
-    ].dropna(subset=["gdp_pc_ppp", "co2_per_capita", "population"])
-
-    fig = px.scatter(
-        sub,
-        x="gdp_pc_ppp",
-        y="co2_per_capita",
-        size="population",
-        color="low_carbon_energy_share_pct",
-        hover_name="country",
-        log_x=True,
+def make_top10_bar(top_df, col, label, year):
+    """Build a horizontal bar chart colored by value for the top 10 countries."""
+    fig = px.bar(
+        top_df,
+        x=col,
+        y="country",
+        orientation="h",
+        color=col,
         color_continuous_scale="Tealgrn",
-        labels={
-            "gdp_pc_ppp": "GDP per capita, PPP ($, log scale)",
-            "co2_per_capita": "CO₂ per capita (tonnes)",
-            "low_carbon_energy_share_pct": "Low-Carbon Share (%)",
-        },
-        height=480,
+        title=f"Top 10 Countries: {label} ({year})",
+        labels={col: label, "country": "Country"},
+        template="plotly_white",
     )
-    fig.update_layout(margin=dict(l=20, r=20, t=20, b=20))
+    fig.update_layout(yaxis={"autorange": "reversed"}, coloraxis_showscale=False)
+    return fig
+
+
+def make_energy_pie(df, sources, title, height=260):
+    """Build a compact pie chart of energy mix (TWh) for the latest row in df."""
+    if df.empty:
+        return None
+
+    last_df = df.tail(1)
+    year = int(last_df["year"].iloc[0])
+
+    rows = []
+    for col, label in sources:
+        val = float(share_to_twh(last_df, col).iloc[0])
+        if val > 0:
+            rows.append({"Source": label, "TWh": val})
+
+    if not rows:
+        return None
+
+    pie_df = pd.DataFrame(rows)
+    fig = px.pie(
+        pie_df,
+        names="Source",
+        values="TWh",
+        color="Source",
+        color_discrete_map=COLORS,
+        title=f"{title} ({year})",
+        template="plotly_white",
+        height=height,
+    )
+    fig.update_layout(margin=dict(t=40, b=10, l=10, r=10))
     return fig

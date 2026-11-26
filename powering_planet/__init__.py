@@ -1,4 +1,1 @@
-from .dataset import EnergyDataset
-from .models import CountryProfile
-
-__all__ = ["EnergyDataset", "CountryProfile"]
+"""Powering the Planet: energy mix, emissions, and economic decoupling analysis."""

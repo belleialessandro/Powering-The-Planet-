@@ -1,61 +1,64 @@
-"""Domain constants, energy source groupings, and intensity/growth formulas."""
+"""Constants and simple helper functions for energy and growth metrics."""
 
 import numpy as np
 import pandas as pd
-import pycountry
 
-# Chart series definitions: (column_name, display_label, hex_color)
-ENERGY_GROUPS: dict[str, list[tuple[str, str, str]]] = {
-    "overview": [
-        ("fossil_fuels_energy_share_pct", "Fossil fuels", "#6b4f4a"),
-        ("low_carbon_energy_share_pct", "Low carbon", "#2a9d8f"),
-    ],
-    "fossil": [
-        ("coal_energy_share_pct", "Coal", "#4a4a4a"),
-        ("oil_energy_share_pct", "Oil", "#c65d6e"),
-        ("gas_energy_share_pct", "Gas", "#83589c"),
-    ],
-    "low_carbon": [
-        ("nuclear_energy_share_pct", "Nuclear", "#238b7e"),
-        ("hydro_energy_share_pct", "Hydro", "#1d78b5"),
-        ("wind_energy_share_pct", "Wind", "#1d3557"),
-        ("solar_energy_share_pct", "Solar", "#f2a541"),
-        ("biofuels_energy_share_pct", "Biofuels", "#7cb518"),
-        ("other_renewables_including_bioenergy_energy_share_pct", "Other renewables", "#5b8c5a"),
-    ],
+OVERVIEW_SOURCES = [
+    ("fossil_fuels_energy_share_pct", "Fossil fuels"),
+    ("low_carbon_energy_share_pct", "Low carbon"),
+]
+
+FOSSIL_SOURCES = [
+    ("coal_energy_share_pct", "Coal"),
+    ("oil_energy_share_pct", "Oil"),
+    ("gas_energy_share_pct", "Gas"),
+]
+
+LOW_CARBON_SOURCES = [
+    ("nuclear_energy_share_pct", "Nuclear"),
+    ("hydro_energy_share_pct", "Hydro"),
+    ("wind_energy_share_pct", "Wind"),
+    ("solar_energy_share_pct", "Solar"),
+    ("biofuels_energy_share_pct", "Biofuels"),
+    ("other_renewables_including_bioenergy_energy_share_pct", "Other renewables"),
+]
+
+COLORS = {
+    "Fossil fuels": "#6d597a",
+    "Low carbon": "#2a9d8f",
+    "Coal": "#4a4a4a",
+    "Oil": "#c65d6e",
+    "Gas": "#83589c",
+    "Nuclear": "#2b6cb0",
+    "Hydro": "#1d78b5",
+    "Wind": "#2a9d8f",
+    "Solar": "#e9c46a",
+    "Biofuels": "#7cb518",
+    "Other renewables": "#5b8c5a",
 }
 
 
-def share_to_twh(df: pd.DataFrame, share_col: str) -> pd.Series:
-    """Convert a percentage share column into primary energy (TWh)."""
-    # Treat missing share values as 0% so stacked areas remain continuous
-    return df["total_energy_twh"] * df[share_col].fillna(0.0) / 100.0
-
-
-def add_derived_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute carbon intensity of energy (Mt/TWh) and energy intensity of GDP (TWh/$B)."""
+def add_intensity_columns(df):
+    """Add carbon intensity (Mt/TWh) and energy intensity (TWh/$B GDP)."""
     out = df.copy()
-    # Replace zeros with NaN before dividing to avoid inf/-inf values
-    out["carbon_intensity_energy"] = out["co2"] / out["total_energy_twh"].replace(0, np.nan)
-    gdp_billions = out["gdp_ppp"] / 1e9
-    out["energy_intensity_gdp"] = out["total_energy_twh"] / gdp_billions.replace(0, np.nan)
+    energy_safe = out["total_energy_twh"].replace(0, np.nan)
+    gdp_billions = (out["gdp_ppp"] / 1e9).replace(0, np.nan)
+
+    out["carbon_intensity_energy"] = out["co2"] / energy_safe
+    out["energy_intensity_gdp"] = out["total_energy_twh"] / gdp_billions
     return out
 
 
-def compute_cagr(start_val: float, end_val: float, years: int) -> float:
-    """Compute Compound Annual Growth Rate (%)."""
-    if years <= 0 or pd.isna(start_val) or pd.isna(end_val) or start_val <= 0 or end_val <= 0:
+def share_to_twh(df, share_col):
+    """Convert an energy share (%) column into TWh."""
+    share = df[share_col].fillna(0)
+    return df["total_energy_twh"] * share / 100
+
+
+def compute_cagr(start_val, end_val, years):
+    """Compute Compound Annual Growth Rate in percent."""
+    if years <= 0 or pd.isna(start_val) or pd.isna(end_val):
         return np.nan
-    return float(((end_val / start_val) ** (1.0 / years) - 1.0) * 100.0)
-
-
-def iso3_to_flag(iso3: str) -> str:
-    """Convert a 3-letter ISO country code (e.g., 'ITA') to a Unicode flag emoji."""
-    if not isinstance(iso3, str) or len(iso3) != 3 or iso3.startswith("OWID"):
-        return ""
-    country = pycountry.countries.get(alpha_3=iso3.upper())
-    if not country:
-        return ""
-    # Map ISO-2 letters ('A'..'Z' -> 65..90) into regional indicator symbols (127462..127487)
-    alpha2 = country.alpha_2.upper()
-    return "".join(chr(ord(char) + 127397) for char in alpha2)
+    if start_val <= 0 or end_val <= 0:
+        return np.nan
+    return float(((end_val / start_val) ** (1 / years) - 1) * 100)
