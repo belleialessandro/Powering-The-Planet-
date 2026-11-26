@@ -1,5 +1,11 @@
 # 🌍 Powering the Planet
 
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![pandas](https://img.shields.io/badge/pandas-Data-150458?logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-Array-013243?logo=numpy&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-Charts-3F4F75?logo=plotly&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)
+
 An interactive Python data science package and multi-page **Streamlit** web application for exploring global primary energy mixes, economic growth vs. CO₂ emissions decoupling, head-to-head country comparisons, and counterfactual decarbonization scenarios.
 
 Built for the **Coding for Data Science and Data Management** course (M.Sc. in Data Science for Economics and Health, Università degli Studi di Milano).
@@ -9,27 +15,30 @@ Built for the **Coding for Data Science and Data Management** course (M.Sc. in D
 ## ✨ Key Features
 
 - **Country Energy Profiles & Decarbonization Simulator (`pages/country_profile.py`)**
-  - Interactive time-series breakdown of primary energy consumption (low-carbon vs. fossil fuels, and disaggregated fuel shares across coal, oil, gas, nuclear, hydro, wind, solar, biofuels, and other renewables).
-  - Automated **GDP–Energy–CO₂ decoupling classification** (*Absolute Decoupling*, *Relative Decoupling*, or *Coupled Growth*) computed via Compound Annual Growth Rates (CAGR), plus an indexed trajectory comparison chart.
+  - Interactive time-series breakdown of primary energy consumption (low-carbon vs. fossil fuels, and disaggregated fuel shares across coal, oil, gas, nuclear, hydro, wind, solar, biofuels, and other renewables), plus latest-year pie charts.
+  - Automated **GDP–Energy–CO₂ decoupling classification** (*Absolute Decoupling*, *Relative Decoupling*, or *Coupled / No Growth*) computed via Compound Annual Growth Rates (CAGR), plus an indexed trajectory comparison chart.
   - Interactive **What-If Fossil Phase-Out Simulator** estimating CO₂ reductions (Mt) from replacing shares of **coal, oil, and natural gas** with zero-carbon energy, alongside a full country-level data table.
 - **Head-to-Head Country Comparison (`pages/compare.py`)**
   - Side-by-side comparison of any two countries across key energy, emissions, and macroeconomic metrics over a shared year range.
-  - Direct trajectory overlay charts and parallel primary energy mix breakdowns.
+  - Feature selector with a direct trajectory overlay chart and a selector to compare energy mix charts (overview, fossil fuels, or low-carbon sources) side by side.
 - **Global Energy Transition Ranking (`pages/ranking.py`)**
-  - **Core Transition Ranking:** Cross-country leaderboard with a 1st–3rd podium and full table ranked by low-carbon energy share, renewables share, lowest carbon intensity (Mt CO₂ / TWh), or lowest energy intensity (TWh / $B GDP), with one-click CSV export.
+  - **Core Transition Ranking:** Cross-country leaderboard with top-3 metrics and full table ranked by low-carbon energy share, renewables share, lowest carbon intensity (Mt/TWh), or lowest energy intensity (TWh/$B GDP), with one-click CSV export.
   - **Top 10 Countries by Feature:** Interactive horizontal bar chart ranking the top 10 countries for any selected energy, emissions, or economic indicator.
 - **Modular Python Backend (`powering_planet/`)**
-  - Object-oriented package (`EnergyDataset`, `CountryProfile`) separating automated data ingestion, preprocessing, scenario modeling, and Plotly visualizations from the Streamlit UI.
+  - Plain Python functions separating data download/merging (`api.py`), metrics and colors (`metrics.py`), filtering/decoupling/ranking (`dataset.py`), simulation (`analysis.py`), and Plotly charts (`plots.py`) from the Streamlit pages.
 
 ---
 
-## 📊 Data Sources
+## 📊 Data Sources & Data Structure
 
-The automated pipeline (`powering_planet/api.py`) fetches and merges four open macroeconomic and energy datasets from 1960 onward:
-1. **Our World in Data (OWID) — Energy Data:** Primary energy consumption (TWh), population, and energy mix shares by source.
-2. **Our World in Data (OWID) — CO₂ and Greenhouse Gas Emissions:** Annual territorial CO₂ emissions (Mt), CO₂ per capita, and share of global CO₂.
-3. **World Bank Open Data (via OWID Grapher):** GDP per capita, PPP (constant international $).
-4. **World Bank Open Data (via OWID Grapher):** Total GDP, PPP (constant international $).
+The automated pipeline (`powering_planet/api.py`) fetches and merges four open macroeconomic and energy datasets from `1960` onward on `["iso_code", "year"]` into `data/dataset.csv`:
+
+1. **Our World in Data (OWID) — Energy Data:** Primary energy consumption (TWh), population, and fuel share columns (`country`, `iso_code`, `population`, `year`, `total_energy_twh`, and source share columns).
+2. **Our World in Data (OWID) — CO₂:** Territorial CO₂ emissions (`co2`, Mt), CO₂ per capita (`co2_per_capita`), and share of global CO₂ (`share_global_co2`).
+3. **World Bank GDP per Capita (via OWID Grapher):** PPP GDP per capita (`gdp_pc_ppp`, constant international $).
+4. **World Bank Total GDP (via OWID Grapher):** Total PPP GDP (`gdp_ppp`, constant international $).
+
+Derived columns added on load (`powering_planet/metrics.py` / `dataset.py`) include `carbon_intensity_energy` (Mt CO₂ / TWh) and `energy_intensity_gdp` (TWh / $B GDP).
 
 ---
 
@@ -37,7 +46,7 @@ The automated pipeline (`powering_planet/api.py`) fetches and merges four open m
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/belleialessandro/Powering-The-Planet-.git
+git clone [https://github.com/belleialessandro/Powering-The-Planet-.git](https://github.com/belleialessandro/Powering-The-Planet-.git)
 cd Powering-The-Planet-
 ```
 
@@ -79,7 +88,6 @@ Open the local URL printed in the terminal (typically `http://localhost:8501`).
 ```text
 Powering-The-Planet-/
 ├── app.py                   # Streamlit multi-page application entrypoint
-├── pyproject.toml           # Package build configuration
 ├── requirements.txt         # Project dependencies
 ├── data/
 │   ├── raw/                 # Cached raw source CSVs (downloaded via api.py)
