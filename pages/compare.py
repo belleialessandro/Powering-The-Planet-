@@ -27,18 +27,20 @@ def cached_load_data(path):
     """Load the dataset once and cache it across interactions."""
     return load_data(path)
 
-
+# initial Dashboard 
 def show_country_summary(cdf, name):
     """Show key metrics for one country."""
     st.subheader(name)
     dec = decoupling_status(cdf)
     st.caption(f"Decoupling: {dec['status']}")
 
+    # Last data row is shown
     co2_val, _ = latest_value(cdf, "co2")
     eng_val, _ = latest_value(cdf, "total_energy_twh")
     gdp_pc_val, _ = latest_value(cdf, "gdp_pc_ppp")
     low_c_val, _ = latest_value(cdf, "low_carbon_energy_share_pct")
 
+    # make the 4 KPIs on the same row by putting 2 columns side-by-side
     col_a, col_b = st.columns(2)
     col_a.metric("CO2", "N/A" if np.isnan(co2_val) else f"{co2_val:,.1f} Mt")
     col_b.metric("Total Energy", "N/A" if np.isnan(eng_val) else f"{eng_val:,.1f} TWh")
@@ -47,7 +49,7 @@ def show_country_summary(cdf, name):
 
 
 def get_feature_options(df):
-    """Return a dictionary of friendly feature labels to column names present in df."""
+    """Return a dictionary of friendly feature labels to column names present in df for better design."""
     all_features = {
         "Low-Carbon Energy Share (%)": "low_carbon_energy_share_pct",
         "Renewables Share (%)": "renewables_energy_share_pct",
@@ -91,6 +93,7 @@ idx_2 = countries.index("Germany") if "Germany" in countries else min(1, len(cou
 country_1 = st.sidebar.selectbox("First country", countries, index=idx_1)
 country_2 = st.sidebar.selectbox("Second country", countries, index=idx_2)
 
+# Raise error if same country is chosen
 if country_1 == country_2:
     st.warning("Choose two different countries to compare.")
 

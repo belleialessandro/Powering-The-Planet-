@@ -1,17 +1,13 @@
-"""Country ranking page: leaderboard, podium, CSV download, and Top 10 chart."""
+"""Country ranking page: leaderboard, podium, CSV download, Top 10, and scatter."""
 
 import os
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from powering_planet.dataset import (
-    DEFAULT_DATA_PATH,
-    filter_country,
-    load_data,
-    rank_countries,
-)
-from powering_planet.plots import make_top10_bar
+from powering_planet.dataset import DEFAULT_DATA_PATH, filter_country, get_countries, load_data, rank_countries
+from powering_planet.plots import make_feature_scatter, make_top10_bar
+from powering_planet.metrics import METRIC_OPTIONS, FEATURE_OPTIONS
 
 
 @st.cache_data
@@ -32,14 +28,8 @@ year = st.sidebar.selectbox("Year", all_years, index=all_years.index(default_yea
 st.divider()
 st.subheader("Transition Ranking")
 
-metric_options = {
-    "Low-Carbon Energy Share (%)": ("low_carbon_energy_share_pct", False),
-    "Renewables Energy Share (%)": ("renewables_energy_share_pct", False),
-    "Lowest Carbon Intensity (Mt/TWh)": ("carbon_intensity_energy", True),
-    "Lowest Energy Intensity (TWh/$B GDP)": ("energy_intensity_gdp", True),
-}
-metric_label = st.selectbox("Rank by", list(metric_options.keys()))
-sort_col, ascending = metric_options[metric_label]
+metric_label = st.selectbox("Rank by", list(METRIC_OPTIONS.keys()))
+sort_col, ascending = METRIC_OPTIONS[metric_label]
 
 ranked = rank_countries(df, year=year, sort_by=sort_col, ascending=ascending)
 
@@ -79,19 +69,8 @@ else:
 st.divider()
 st.subheader("Top 10 Countries by Indicator")
 
-feature_options = {
-    "Total Energy (TWh)": "total_energy_twh",
-    "Total CO2 (Mt)": "co2",
-    "CO2 per Capita (t)": "co2_per_capita",
-    "GDP per Capita PPP ($)": "gdp_pc_ppp",
-    "GDP PPP ($)": "gdp_ppp",
-    "Solar Share (%)": "solar_energy_share_pct",
-    "Wind Share (%)": "wind_energy_share_pct",
-    "Hydro Share (%)": "hydro_energy_share_pct",
-    "Coal Share (%)": "coal_energy_share_pct",
-}
-feat_label = st.selectbox("Indicator", list(feature_options.keys()))
-feat_col = feature_options[feat_label]
+feat_label = st.selectbox("Indicator", list(FEATURE_OPTIONS.keys()))
+feat_col = FEATURE_OPTIONS[feat_label]
 
 ranked_feat = rank_countries(df, year=year, sort_by=feat_col, ascending=False)
 top10 = ranked_feat.head(10)
@@ -100,6 +79,42 @@ if top10.empty:
     st.info("No data available for this indicator and year.")
 else:
     st.plotly_chart(make_top10_bar(top10, feat_col, feat_label, year), width="stretch")
+
+st.divider()
+st.subheader("Country Scatter Plot")
+
+year_df = rank_countries(df, year=year, sort_by=feat_col, ascending=False)
+available_countries = get_countries(year_df)
+
+col_x, col_y, col_z = st.columns(3)
+x_label = col_x.selectbox("X-axis feature", list(FEATURE_OPTIONS.keys()), index=3)
+y_label = col_y.selectbox("Y-axis feature", list(FEATURE_OPTIONS.keys()), index=2)
+z_label = col_z.selectbox("Color feature", list(FEATURE_OPTIONS.keys()), index=1)
+
+selected_countries = st.multiselect(
+    "Filter countries (leave empty to show all countries)",
+    options=available_countries,
+    default=[],
+)
+
+scatter_df = year_df
+if selected_countries:
+    scatter_df = year_df[year_df["country"].isin(selected_countries)]
+
+scatter_fig = make_feature_scatter(
+    scatter_df,
+    FEATURE_OPTIONS[x_label],
+    x_label,
+    FEATURE_OPTIONS[y_label],
+    y_label,
+    FEATURE_OPTIONS[z_label],
+    z_label,
+    year,
+)
+if scatter_fig is None:
+    st.info("No data available for the selected features, countries, and year.")
+else:
+    st.plotly_chart(scatter_fig, width="stretch")
 
 # Keep filter_country imported if needed for inspection
 _ = filter_country
