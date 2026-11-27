@@ -4,9 +4,9 @@ import pandas as pd
 import plotly.express as px
 from powering_planet.metrics import COLORS, share_to_twh
 
-
+# Chart makers
 def make_energy_chart(df, sources, title):
-    """Build a stacked area chart of primary energy (TWh) over time."""
+    """Build a stacked area chart of energy by type (TWh) over time."""
     plot_df = df[["year"]].copy()
     value_cols = []
     for col, label in sources:
@@ -82,7 +82,7 @@ def make_top10_bar(top_df, col, label, year):
 
 
 def make_energy_pie(df, sources, title, height=260):
-    """Build a compact pie chart of energy mix (TWh) for the latest row in df."""
+    """Build a compact pie chart of energy mix (TWh) using the latest row in df."""
     if df.empty:
         return None
 
@@ -110,4 +110,25 @@ def make_energy_pie(df, sources, title, height=260):
         height=height,
     )
     fig.update_layout(margin=dict(t=40, b=10, l=10, r=10))
+    return fig
+
+def make_feature_scatter(sub_df, x_col, x_label, y_col, y_label, z_col, z_label, year):
+    """Build a scatter plot comparing three features across countries for one year."""
+    plot_df = sub_df.dropna(subset=[x_col, y_col]).copy()
+    if plot_df.empty:
+        return None
+
+    size_col = "population" if "population" in plot_df.columns else None
+    fig = px.scatter(
+        plot_df,
+        x=x_col,
+        y=y_col,
+        size=size_col,
+        hover_name="country",
+        color=z_col,
+        color_continuous_scale="Tealgrn",
+        title=f"{y_label} vs. {x_label} colouring by {z_label} ({year})",
+        labels={x_col: x_label, y_col: y_label, "low_carbon_energy_share_pct": "Low-Carbon (%)"},
+        template="plotly_white",
+    )
     return fig
