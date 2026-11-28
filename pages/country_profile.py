@@ -2,49 +2,40 @@
 
 import os
 import numpy as np
-import pandas as pd
 import streamlit as st
-
-from powering_planet.analysis import simulate_phase_out
-from powering_planet.dataset import (
-    DEFAULT_DATA_PATH,
-    decoupling_status,
-    filter_country,
-    get_countries,
-    latest_value,
-    load_data,
-)
+from powering_planet import analysis as a
 from powering_planet import config as c
-from powering_planet.plots import make_decoupling_chart, make_energy_chart, make_energy_pie
+from powering_planet import dataset as d
+from powering_planet import plots as p
 
 
 @st.cache_data
 def cached_load_data(path):
     """Load the dataset once and cache it across interactions."""
-    return load_data(path)
+    return d.load_data(path)
 
 
-data_file = os.path.join(os.path.dirname(__file__), "..", DEFAULT_DATA_PATH)
+data_file = os.path.join(os.path.dirname(__file__), "..", d.DEFAULT_DATA_PATH)
 df = cached_load_data(data_file)
 
-countries = get_countries(df)
+countries = d.get_countries(df)
 
 default_index = countries.index("Italy") if "Italy" in countries else 0
 country = st.sidebar.selectbox("Country", countries, index=default_index)
 
-full_country_df = filter_country(df, country)
+full_country_df = d.filter_country(df, country)
 min_year = int(full_country_df["year"].min())
 max_year = int(full_country_df["year"].max())
 default_start = max(min_year, max_year - 30)
 years = st.sidebar.slider("Year range", min_year, max_year, (default_start, max_year))
 
-cdf = filter_country(df, country, years=years)
+cdf = d.filter_country(df, country, years=years)
 st.title(f"{country} ({years[0]}–{years[1]})")
 
-co2_val, co2_yr = latest_value(cdf, "co2")
-gdp_val, gdp_yr = latest_value(cdf, "gdp_ppp")
-eng_val, eng_yr = latest_value(cdf, "total_energy_twh")
-dec = decoupling_status(cdf)
+co2_val, co2_yr = d.latest_value(cdf, "co2")
+gdp_val, gdp_yr = d.latest_value(cdf, "gdp_ppp")
+eng_val, eng_yr = d.latest_value(cdf, "total_energy_twh")
+dec = d.decoupling_status(cdf)
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric(
@@ -75,7 +66,7 @@ pie_cols = st.columns(3)
 for idx in range(len(pie_specs)):
     sources, label = pie_specs[idx]
     with pie_cols[idx]:
-        pie_fig = make_energy_pie(cdf, sources, label, height=260)
+        pie_fig = p.make_energy_pie(cdf, sources, label, height=260)
         if pie_fig is None:
             st.caption(f"{label}: no data")
         else:
@@ -85,22 +76,22 @@ st.divider()
 st.subheader("Energy Mix Over Time")
 
 st.plotly_chart(
-    make_energy_chart(cdf, c.OVERVIEW_SOURCES, "Fossil vs. Low-Carbon Energy"),
+    p.make_energy_chart(cdf, c.OVERVIEW_SOURCES, "Fossil vs. Low-Carbon Energy"),
     width="stretch",
 )
 st.plotly_chart(
-    make_energy_chart(cdf, c.FOSSIL_SOURCES, "Fossil Fuels by Source"),
+    p.make_energy_chart(cdf, c.FOSSIL_SOURCES, "Fossil Fuels by Source"),
     width="stretch",
 )
 st.plotly_chart(
-    make_energy_chart(cdf, c.LOW_CARBON_SOURCES, "Low-Carbon Energy by Source"),
+    p.make_energy_chart(cdf, c.LOW_CARBON_SOURCES, "Low-Carbon Energy by Source"),
     width="stretch",
 )
 
 st.divider()
 st.subheader("GDP, Energy, and CO2 Trends")
 
-dec_fig = make_decoupling_chart(cdf)
+dec_fig = p.make_decoupling_chart(cdf)
 if dec_fig is None:
     st.info("Not enough overlapping years for the indexed chart.")
 else:
@@ -121,7 +112,7 @@ else:
     oil_cut = s2.slider("Oil cut (%)", 0, 100, 25)
     gas_cut = s3.slider("Gas cut (%)", 0, 100, 25)
 
-    sim = simulate_phase_out(base_row, coal_cut, oil_cut, gas_cut)
+    sim = a.simulate_phase_out(base_row, coal_cut, oil_cut, gas_cut)
     m1, m2, m3 = st.columns(3)
     m1.metric("Baseline CO2", f"{sim['baseline_co2_mt']:,.1f} Mt")
     m2.metric(
@@ -135,22 +126,7 @@ else:
 st.divider()
 st.subheader("Country Data Table")
 
-table_cols = [
-    "year",
-    "population",
-    "total_energy_twh",
-    "coal_energy_share_pct",
-    "oil_energy_share_pct",
-    "gas_energy_share_pct",
-    "nuclear_energy_share_pct",
-    "hydro_energy_share_pct",
-    "wind_energy_share_pct",
-    "solar_energy_share_pct",
-    "co2",
-    "co2_per_capita",
-    "gdp_pc_ppp",
-    "gdp_ppp",
-]
-existing_cols = [col for col in table_cols if col in cdf.columns]
-show_df = cdf[existing_cols].sort_values("year", ascending=False).reset_index(drop=True)
+col_names = {col: label for label, col in c.FEATURE_OPTIONS.items()} | {"year": "Year"}
+existing_cols = [col for col in c.TABLE_COLS if col in cdf.columns]
+show_df = cdf[existing_cols].sort_values("year", ascending=False).reset_index(drop=True).rename(columns=col_names)
 st.dataframe(show_df, width="stretch", hide_index=True)

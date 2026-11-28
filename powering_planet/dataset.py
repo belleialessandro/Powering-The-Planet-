@@ -3,7 +3,7 @@
 import os
 import numpy as np
 import pandas as pd
-from powering_planet.metrics import add_intensity_columns, compute_cagr
+from powering_planet import metrics as m
 
 DEFAULT_DATA_PATH = os.path.join("data", "dataset.csv")
 
@@ -13,7 +13,7 @@ def load_data(path=DEFAULT_DATA_PATH):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Dataset not found at {path}. Run python -m powering_planet.api first.")
     df = pd.read_csv(path)
-    df = add_intensity_columns(df)
+    df = m.add_intensity_columns(df)
     return df.sort_values(["country", "year"]).reset_index(drop=True)
 
 
@@ -53,8 +53,8 @@ def decoupling_status(df):
     last_row = valid.iloc[-1]
     span = int(last_row["year"] - first_row["year"])
 
-    gdp_cagr = compute_cagr(first_row["gdp_ppp"], last_row["gdp_ppp"], span)
-    co2_cagr = compute_cagr(first_row["co2"], last_row["co2"], span)
+    gdp_cagr = m.compute_cagr(first_row["gdp_ppp"], last_row["gdp_ppp"], span)
+    co2_cagr = m.compute_cagr(first_row["co2"], last_row["co2"], span)
 
     if pd.isna(gdp_cagr) or pd.isna(co2_cagr):
         status = "Insufficient data"

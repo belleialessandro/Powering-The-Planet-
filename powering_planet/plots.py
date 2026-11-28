@@ -2,7 +2,8 @@
 
 import pandas as pd
 import plotly.express as px
-from powering_planet.metrics import COLORS, share_to_twh
+from powering_planet.metrics import share_to_twh
+from powering_planet.config import COLORS
 
 # Chart makers
 def make_energy_chart(df, sources, title):
@@ -132,3 +133,21 @@ def make_feature_scatter(sub_df, x_col, x_label, y_col, y_label, z_col, z_label,
         template="plotly_white",
     )
     return fig
+
+def make_comparison_line(cdf_1, name_1, cdf_2, name_2, col, label):
+    """Build a two-country trend line chart for a single feature."""
+    sub_1 = cdf_1[["year", col]].dropna().assign(Country=name_1)
+    sub_2 = cdf_2[["year", col]].dropna().assign(Country=name_2)
+    combined = pd.concat([sub_1, sub_2], ignore_index=True)
+    if combined.empty:
+        return None
+
+    return px.line(
+        combined,
+        x="year",
+        y=col,
+        color="Country",
+        title=f"{label}: {name_1} vs. {name_2}",
+        labels={"year": "Year", col: label},
+        template="plotly_white",
+    )

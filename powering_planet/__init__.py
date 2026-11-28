@@ -1,1 +1,1 @@
-"""Powering the Planet: energy mix, emissions, and economic decoupling analysis."""
+"""Powering the Planet: energy mix, emissions, and economic decoupling analysis per country"""

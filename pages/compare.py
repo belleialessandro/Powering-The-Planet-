@@ -2,86 +2,18 @@
 
 import os
 import numpy as np
-import pandas as pd
-import plotly.express as px
 import streamlit as st
-
-from powering_planet.dataset import (
-    DEFAULT_DATA_PATH,
-    decoupling_status,
-    filter_country,
-    get_countries,
-    latest_value,
-    load_data,
-)
 from powering_planet import config as c
-from powering_planet.plots import make_energy_chart
+from powering_planet import dataset as d
+from powering_planet import metrics as m
+from powering_planet import plots as p
 
-
-@st.cache_data
-def cached_load_data(path):
-    """Load the dataset once and cache it across interactions."""
-    return load_data(path)
-
-# initial Dashboard 
-def show_country_summary(cdf, name):
-    """Show key metrics for one country."""
-    st.subheader(name)
-    dec = decoupling_status(cdf)
-    st.caption(f"Decoupling: {dec['status']}")
-
-    # Last data row is shown
-    co2_val, _ = latest_value(cdf, "co2")
-    eng_val, _ = latest_value(cdf, "total_energy_twh")
-    gdp_pc_val, _ = latest_value(cdf, "gdp_pc_ppp")
-    low_c_val, _ = latest_value(cdf, "low_carbon_energy_share_pct")
-
-    # make the 4 KPIs on the same row by putting 2 columns side-by-side
-    col_a, col_b = st.columns(2)
-    col_a.metric("CO2", "N/A" if np.isnan(co2_val) else f"{co2_val:,.1f} Mt")
-    col_b.metric("Total Energy", "N/A" if np.isnan(eng_val) else f"{eng_val:,.1f} TWh")
-    col_a.metric("GDP / Capita", "N/A" if np.isnan(gdp_pc_val) else f"${gdp_pc_val:,.0f}")
-    col_b.metric("Low-Carbon Share", "N/A" if np.isnan(low_c_val) else f"{low_c_val:,.1f}%")
-
-
-def get_feature_options(df):
-    """Return a dictionary of friendly feature labels to column names present in df for better design."""
-    all_features = {
-        "Low-Carbon Energy Share (%)": "low_carbon_energy_share_pct",
-        "Renewables Share (%)": "renewables_energy_share_pct",
-        "Fossil Fuels Share (%)": "fossil_fuels_energy_share_pct",
-        "Coal Share (%)": "coal_energy_share_pct",
-        "Oil Share (%)": "oil_energy_share_pct",
-        "Gas Share (%)": "gas_energy_share_pct",
-        "Nuclear Share (%)": "nuclear_energy_share_pct",
-        "Hydro Share (%)": "hydro_energy_share_pct",
-        "Wind Share (%)": "wind_energy_share_pct",
-        "Solar Share (%)": "solar_energy_share_pct",
-        "Biofuels Share (%)": "biofuels_energy_share_pct",
-        "Other Renewables Share (%)": "other_renewables_including_bioenergy_energy_share_pct",
-        "Total Energy (TWh)": "total_energy_twh",
-        "Total CO2 (Mt)": "co2",
-        "CO2 per Capita (t)": "co2_per_capita",
-        "Share of Global CO2 (%)": "share_global_co2",
-        "Carbon Intensity (Mt/TWh)": "carbon_intensity_energy",
-        "Energy Intensity (TWh/$B GDP)": "energy_intensity_gdp",
-        "GDP per Capita PPP ($)": "gdp_pc_ppp",
-        "GDP PPP ($)": "gdp_ppp",
-        "Population": "population",
-    }
-    available = {}
-    for label, col in all_features.items():
-        if col in df.columns:
-            available[label] = col
-    return available
-
-
-data_file = os.path.join(os.path.dirname(__file__), "..", DEFAULT_DATA_PATH)
-df = cached_load_data(data_file)
+data_file = os.path.join(os.path.dirname(__file__), "..", d.DEFAULT_DATA_PATH)
+df = st.cache_data(d.load_data)(data_file)
 
 st.title("Country Comparator")
 
-countries = get_countries(df)
+countries = d.get_countries(df)
 
 idx_1 = countries.index("Italy") if "Italy" in countries else 0
 idx_2 = countries.index("Germany") if "Germany" in countries else min(1, len(countries) - 1)
@@ -89,36 +21,74 @@ idx_2 = countries.index("Germany") if "Germany" in countries else min(1, len(cou
 country_1 = st.sidebar.selectbox("First country", countries, index=idx_1)
 country_2 = st.sidebar.selectbox("Second country", countries, index=idx_2)
 
-# Raise error if same country is chosen
+# Raise warning is same country twice
 if country_1 == country_2:
     st.warning("Choose two different countries to compare.")
 
-full_1 = filter_country(df, country_1)
-full_2 = filter_country(df, country_2)
+full_1 = d.filter_country(df, country_1)
+full_2 = d.filter_country(df, country_2)
 
 min_y = int(max(full_1["year"].min(), full_2["year"].min()))
 max_y = int(min(full_1["year"].max(), full_2["year"].max()))
 default_start = max(min_y, max_y - 30)
 years = st.sidebar.slider("Year range", min_y, max_y, (default_start, max_y))
 
-cdf_1 = filter_country(df, country_1, years=years)
-cdf_2 = filter_country(df, country_2, years=years)
+cdf_1 = d.filter_country(df, country_1, years=years)
+cdf_2 = d.filter_country(df, country_2, years=years)
 
 left_col, right_col = st.columns(2)
-with left_col:
-    show_country_summary(cdf_1, country_1)
-with right_col:
-    show_country_summary(cdf_2, country_2)
+for col_ui, cdf_self, name_self, cdf_other in [
+    (left_col, cdf_1, country_1, cdf_2),
+    (right_col, cdf_2, country_2, cdf_1),
+]:
+    with col_ui:
+        st.subheader(name_self)
+        dec = d.decoupling_status(cdf_self)
+        st.caption(f"Decoupling: {dec['status']}")
+
+        co2_1, _ = d.latest_value(cdf_self, "co2")
+        eng_1, _ = d.latest_value(cdf_self, "total_energy_twh")
+        gdp_1, _ = d.latest_value(cdf_self, "gdp_pc_ppp")
+        low_1, _ = d.latest_value(cdf_self, "low_carbon_energy_share_pct")
+
+        co2_2, _ = d.latest_value(cdf_other, "co2")
+        eng_2, _ = d.latest_value(cdf_other, "total_energy_twh")
+        gdp_2, _ = d.latest_value(cdf_other, "gdp_pc_ppp")
+        low_2, _ = d.latest_value(cdf_other, "low_carbon_energy_share_pct")
+
+        col_a, col_b = st.columns(2)
+        col_a.metric(
+            "CO2",
+            "N/A" if np.isnan(co2_1) else f"{co2_1:,.1f} Mt",
+            delta=m.fmt_diff(co2_1, co2_2, "+,.1f", " Mt"),
+            delta_color="inverse",
+        )
+        col_b.metric(
+            "Total Energy",
+            "N/A" if np.isnan(eng_1) else f"{eng_1:,.1f} TWh",
+            delta=m.fmt_diff(eng_1, eng_2, "+,.1f", " TWh"),
+            delta_color="off",
+        )
+        col_a.metric(
+            "GDP / Capita",
+            "N/A" if np.isnan(gdp_1) else f"${gdp_1:,.0f}",
+            delta=m.fmt_diff(gdp_1, gdp_2, "+,.0f"),
+        )
+        col_b.metric(
+            "Low-Carbon Share",
+            "N/A" if np.isnan(low_1) else f"{low_1:,.1f}%",
+            delta=m.fmt_diff(low_1, low_2, "+,.1f", "%"),
+        )
 
 st.divider()
 st.subheader("Trend Comparison")
 
-indicator_map = get_feature_options(df)
+indicator_map = c.FEATURE_OPTIONS
 ind_label = st.selectbox("Select feature to compare", list(indicator_map.keys()))
 ind_col = indicator_map[ind_label]
 
-latest_1, yr_1 = latest_value(cdf_1, ind_col)
-latest_2, yr_2 = latest_value(cdf_2, ind_col)
+latest_1, yr_1 = d.latest_value(cdf_1, ind_col)
+latest_2, yr_2 = d.latest_value(cdf_2, ind_col)
 m_left, m_right = st.columns(2)
 m_left.metric(
     f"{country_1} ({yr_1})" if yr_1 else country_1,
@@ -129,22 +99,10 @@ m_right.metric(
     "N/A" if np.isnan(latest_2) else f"{latest_2:,.2f}",
 )
 
-sub_1 = cdf_1[["year", ind_col]].dropna().assign(Country=country_1)
-sub_2 = cdf_2[["year", ind_col]].dropna().assign(Country=country_2)
-combined = pd.concat([sub_1, sub_2], ignore_index=True)
-
-if combined.empty:
+fig_line = p.make_comparison_line(cdf_1, country_1, cdf_2, country_2, ind_col, ind_label)
+if fig_line is None:
     st.info("No data available for this feature.")
 else:
-    fig_line = px.line(
-        combined,
-        x="year",
-        y=ind_col,
-        color="Country",
-        title=f"{ind_label}: {country_1} vs. {country_2}",
-        labels={"year": "Year", ind_col: ind_label},
-        template="plotly_white",
-    )
     st.plotly_chart(fig_line, width="stretch")
 
 st.divider()
@@ -161,11 +119,11 @@ selected_sources = mix_options[mix_choice]
 mix_left, mix_right = st.columns(2)
 with mix_left:
     st.plotly_chart(
-        make_energy_chart(cdf_1, selected_sources, f"{country_1}: {mix_choice}"),
+        p.make_energy_chart(cdf_1, selected_sources, f"{country_1}: {mix_choice}"),
         width="stretch",
     )
 with mix_right:
     st.plotly_chart(
-        make_energy_chart(cdf_2, selected_sources, f"{country_2}: {mix_choice}"),
+        p.make_energy_chart(cdf_2, selected_sources, f"{country_2}: {mix_choice}"),
         width="stretch",
     )

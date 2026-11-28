@@ -35,7 +35,11 @@ ENERGY_COLS = [
     "total_energy_twh",
 ]
 
-CO2_COLS = ["iso_code", "year", "co2", "co2_per_capita", "share_global_co2"]
+CO2_COLS = ["iso_code",
+    "year",
+    "co2",
+    "co2_per_capita",
+    "share_global_co2"]
 
 
 def download_file(url, path):

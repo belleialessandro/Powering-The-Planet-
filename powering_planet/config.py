@@ -1,3 +1,5 @@
+"""Shared configuration constants for sources, palettes, and UI options."""
+
 # Lists 
 OVERVIEW_SOURCES = [
     ("fossil_fuels_energy_share_pct", "Fossil fuels"),
@@ -17,6 +19,23 @@ LOW_CARBON_SOURCES = [
     ("solar_energy_share_pct", "Solar"),
     ("biofuels_energy_share_pct", "Biofuels"),
     ("other_renewables_including_bioenergy_energy_share_pct", "Other renewables"),
+]
+
+TABLE_COLS = [
+    "year",
+    "population",
+    "total_energy_twh",
+    "coal_energy_share_pct",
+    "oil_energy_share_pct",
+    "gas_energy_share_pct",
+    "nuclear_energy_share_pct",
+    "hydro_energy_share_pct",
+    "wind_energy_share_pct",
+    "solar_energy_share_pct",
+    "co2",
+    "co2_per_capita",
+    "gdp_pc_ppp",
+    "gdp_ppp",
 ]
 
 # Dictionaries
@@ -42,19 +61,25 @@ METRIC_OPTIONS = {
 }
 
 FEATURE_OPTIONS = {
-    "Total Energy (TWh)": "total_energy_twh", # "Label name": "Variable name"
+    "Low-Carbon Energy Share (%)": "low_carbon_energy_share_pct",
+    "Renewables Share (%)": "renewables_energy_share_pct",
+    "Fossil Fuels Share (%)": "fossil_fuels_energy_share_pct",
+    "Coal Share (%)": "coal_energy_share_pct",
+    "Oil Share (%)": "oil_energy_share_pct",
+    "Gas Share (%)": "gas_energy_share_pct",
+    "Nuclear Share (%)": "nuclear_energy_share_pct",
+    "Hydro Share (%)": "hydro_energy_share_pct",
+    "Wind Share (%)": "wind_energy_share_pct",
+    "Solar Share (%)": "solar_energy_share_pct",
+    "Biofuels Share (%)": "biofuels_energy_share_pct",
+    "Other Renewables Share (%)": "other_renewables_including_bioenergy_energy_share_pct",
+    "Total Energy (TWh)": "total_energy_twh",
     "Total CO2 (Mt)": "co2",
     "CO2 per Capita (t)": "co2_per_capita",
+    "Share of Global CO2 (%)": "share_global_co2",
+    "Carbon Intensity (Mt/TWh)": "carbon_intensity_energy",
+    "Energy Intensity (TWh/$B GDP)": "energy_intensity_gdp",
     "GDP per Capita PPP ($)": "gdp_pc_ppp",
     "GDP PPP ($)": "gdp_ppp",
-    "Low-Carbon Energy Share (%)": "low_carbon_energy_share_pct",
-    "Renewables Energy Share (%)": "renewables_energy_share_pct",
-    "Solar Share (%)": "solar_energy_share_pct",
-    "Wind Share (%)": "wind_energy_share_pct",
-    "Hydro Share (%)": "hydro_energy_share_pct",
-    "Nuclear Share (%)": "nuclear_energy_share_pct",
-    "Coal Share (%)": "coal_energy_share_pct",
-    "Gas Share (%)": "gas_energy_share_pct",
-    "Oil Share (%)": "oil_energy_share_pct",
     "Population": "population",
 }

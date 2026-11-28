@@ -4,19 +4,18 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
-
-from powering_planet.dataset import DEFAULT_DATA_PATH, filter_country, get_countries, load_data, rank_countries
-from powering_planet.plots import make_feature_scatter, make_top10_bar
 from powering_planet import config as c
+from powering_planet import dataset as d
+from powering_planet import plots as p
 
 
 @st.cache_data
 def cached_load_data(path):
     """Load the dataset once and cache it across interactions."""
-    return load_data(path)
+    return d.load_data(path)
 
 
-data_file = os.path.join(os.path.dirname(__file__), "..", DEFAULT_DATA_PATH)
+data_file = os.path.join(os.path.dirname(__file__), "..", d.DEFAULT_DATA_PATH)
 df = cached_load_data(data_file)
 
 st.title("Country Ranking")
@@ -31,7 +30,7 @@ st.subheader("Transition Ranking")
 metric_label = st.selectbox("Rank by", list(c.METRIC_OPTIONS.keys()))
 sort_col, ascending = c.METRIC_OPTIONS[metric_label]
 
-ranked = rank_countries(df, year=year, sort_by=sort_col, ascending=ascending)
+ranked = d.rank_countries(df, year=year, sort_by=sort_col, ascending=ascending)
 
 if ranked.empty:
     st.info("No data available for this year and metric.")
@@ -72,19 +71,19 @@ st.subheader("Top 10 Countries by Indicator")
 feat_label = st.selectbox("Indicator", list(c.FEATURE_OPTIONS.keys()))
 feat_col = c.FEATURE_OPTIONS[feat_label]
 
-ranked_feat = rank_countries(df, year=year, sort_by=feat_col, ascending=False)
+ranked_feat = d.rank_countries(df, year=year, sort_by=feat_col, ascending=False)
 top10 = ranked_feat.head(10)
 
 if top10.empty:
     st.info("No data available for this indicator and year.")
 else:
-    st.plotly_chart(make_top10_bar(top10, feat_col, feat_label, year), width="stretch")
+    st.plotly_chart(p.make_top10_bar(top10, feat_col, feat_label, year), width="stretch")
 
 st.divider()
 st.subheader("Country Scatter Plot")
 
-year_df = rank_countries(df, year=year, sort_by=feat_col, ascending=False)
-available_countries = get_countries(year_df)
+year_df = d.rank_countries(df, year=year, sort_by=feat_col, ascending=False)
+available_countries = d.get_countries(year_df)
 
 col_x, col_y, col_z = st.columns(3)
 x_label = col_x.selectbox("X-axis feature", list(c.FEATURE_OPTIONS.keys()), index=3)
@@ -101,7 +100,7 @@ scatter_df = year_df
 if selected_countries:
     scatter_df = year_df[year_df["country"].isin(selected_countries)]
 
-scatter_fig = make_feature_scatter(
+scatter_fig = p.make_feature_scatter(
     scatter_df,
     c.FEATURE_OPTIONS[x_label],
     x_label,
@@ -117,4 +116,4 @@ else:
     st.plotly_chart(scatter_fig, width="stretch")
 
 # Keep filter_country imported if needed for inspection
-_ = filter_country
+_ = d.filter_country
