@@ -14,11 +14,7 @@ from powering_planet.dataset import (
     latest_value,
     load_data,
 )
-from powering_planet.metrics import (
-    FOSSIL_SOURCES,
-    LOW_CARBON_SOURCES,
-    OVERVIEW_SOURCES,
-)
+from powering_planet import config as c
 from powering_planet.plots import make_energy_chart
 
 
@@ -155,9 +151,9 @@ st.divider()
 st.subheader("Energy Mix Comparison")
 
 mix_options = {
-    "Fossil vs. Low-Carbon": OVERVIEW_SOURCES,
-    "Fossil Fuels by Source": FOSSIL_SOURCES,
-    "Low-Carbon Energy by Source": LOW_CARBON_SOURCES,
+    "Fossil vs. Low-Carbon": c.OVERVIEW_SOURCES,
+    "Fossil Fuels by Source": c.FOSSIL_SOURCES,
+    "Low-Carbon Energy by Source": c.LOW_CARBON_SOURCES,
 }
 mix_choice = st.selectbox("Select energy mix chart", list(mix_options.keys()))
 selected_sources = mix_options[mix_choice]

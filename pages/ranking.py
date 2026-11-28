@@ -7,7 +7,7 @@ import streamlit as st
 
 from powering_planet.dataset import DEFAULT_DATA_PATH, filter_country, get_countries, load_data, rank_countries
 from powering_planet.plots import make_feature_scatter, make_top10_bar
-from powering_planet.metrics import METRIC_OPTIONS, FEATURE_OPTIONS
+from powering_planet import config as c
 
 
 @st.cache_data
@@ -28,8 +28,8 @@ year = st.sidebar.selectbox("Year", all_years, index=all_years.index(default_yea
 st.divider()
 st.subheader("Transition Ranking")
 
-metric_label = st.selectbox("Rank by", list(METRIC_OPTIONS.keys()))
-sort_col, ascending = METRIC_OPTIONS[metric_label]
+metric_label = st.selectbox("Rank by", list(c.METRIC_OPTIONS.keys()))
+sort_col, ascending = c.METRIC_OPTIONS[metric_label]
 
 ranked = rank_countries(df, year=year, sort_by=sort_col, ascending=ascending)
 
@@ -69,8 +69,8 @@ else:
 st.divider()
 st.subheader("Top 10 Countries by Indicator")
 
-feat_label = st.selectbox("Indicator", list(FEATURE_OPTIONS.keys()))
-feat_col = FEATURE_OPTIONS[feat_label]
+feat_label = st.selectbox("Indicator", list(c.FEATURE_OPTIONS.keys()))
+feat_col = c.FEATURE_OPTIONS[feat_label]
 
 ranked_feat = rank_countries(df, year=year, sort_by=feat_col, ascending=False)
 top10 = ranked_feat.head(10)
@@ -87,9 +87,9 @@ year_df = rank_countries(df, year=year, sort_by=feat_col, ascending=False)
 available_countries = get_countries(year_df)
 
 col_x, col_y, col_z = st.columns(3)
-x_label = col_x.selectbox("X-axis feature", list(FEATURE_OPTIONS.keys()), index=3)
-y_label = col_y.selectbox("Y-axis feature", list(FEATURE_OPTIONS.keys()), index=2)
-z_label = col_z.selectbox("Color feature", list(FEATURE_OPTIONS.keys()), index=1)
+x_label = col_x.selectbox("X-axis feature", list(c.FEATURE_OPTIONS.keys()), index=3)
+y_label = col_y.selectbox("Y-axis feature", list(c.FEATURE_OPTIONS.keys()), index=2)
+z_label = col_z.selectbox("Color feature", list(c.FEATURE_OPTIONS.keys()), index=1)
 
 selected_countries = st.multiselect(
     "Filter countries (leave empty to show all countries)",
@@ -103,11 +103,11 @@ if selected_countries:
 
 scatter_fig = make_feature_scatter(
     scatter_df,
-    FEATURE_OPTIONS[x_label],
+    c.FEATURE_OPTIONS[x_label],
     x_label,
-    FEATURE_OPTIONS[y_label],
+    c.FEATURE_OPTIONS[y_label],
     y_label,
-    FEATURE_OPTIONS[z_label],
+    c.FEATURE_OPTIONS[z_label],
     z_label,
     year,
 )

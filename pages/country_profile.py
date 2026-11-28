@@ -14,11 +14,7 @@ from powering_planet.dataset import (
     latest_value,
     load_data,
 )
-from powering_planet.metrics import (
-    FOSSIL_SOURCES,
-    LOW_CARBON_SOURCES,
-    OVERVIEW_SOURCES,
-)
+from powering_planet import config as c
 from powering_planet.plots import make_decoupling_chart, make_energy_chart, make_energy_pie
 
 
@@ -71,9 +67,9 @@ c4.metric(
 )
 
 pie_specs = [
-    (OVERVIEW_SOURCES, "Overview"),
-    (FOSSIL_SOURCES, "Fossil Fuels"),
-    (LOW_CARBON_SOURCES, "Low-Carbon"),
+    (c.OVERVIEW_SOURCES, "Overview"),
+    (c.FOSSIL_SOURCES, "Fossil Fuels"),
+    (c.LOW_CARBON_SOURCES, "Low-Carbon"),
 ]
 pie_cols = st.columns(3)
 for idx in range(len(pie_specs)):
@@ -89,15 +85,15 @@ st.divider()
 st.subheader("Energy Mix Over Time")
 
 st.plotly_chart(
-    make_energy_chart(cdf, OVERVIEW_SOURCES, "Fossil vs. Low-Carbon Energy"),
+    make_energy_chart(cdf, c.OVERVIEW_SOURCES, "Fossil vs. Low-Carbon Energy"),
     width="stretch",
 )
 st.plotly_chart(
-    make_energy_chart(cdf, FOSSIL_SOURCES, "Fossil Fuels by Source"),
+    make_energy_chart(cdf, c.FOSSIL_SOURCES, "Fossil Fuels by Source"),
     width="stretch",
 )
 st.plotly_chart(
-    make_energy_chart(cdf, LOW_CARBON_SOURCES, "Low-Carbon Energy by Source"),
+    make_energy_chart(cdf, c.LOW_CARBON_SOURCES, "Low-Carbon Energy by Source"),
     width="stretch",
 )
 
